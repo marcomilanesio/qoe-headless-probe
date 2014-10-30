@@ -1,0 +1,5 @@
+*.pyc
+probe.conf
+*.log
+*.out
+probe/session_bkp/*
