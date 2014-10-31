@@ -103,7 +103,7 @@ class JSONClient():
 
         #cleaning
         for sid in sids:
-            q = '''update %s set sent where sid = %d''' % (self.activetable, sid)
+            q = '''update %s set sent = 't'::bool where sid = %d''' % (self.activetable, sid)
             self.db.execute_update(q)
             logger.debug('Set sent flag on active table.')
 
