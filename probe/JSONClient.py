@@ -101,6 +101,12 @@ class JSONClient():
                 if int(session['sid']) == sid:
                     session['active'].append(active_data)
 
+        #cleaning
+        for sid in sids:
+            q = '''update %s set sent where sid = %d''' % (self.activetable, sid)
+            self.db.execute_update(q)
+            logger.debug('Set sent flag on active table.')
+
         # measurements is a list of dictionaries
         # one for each session: ['passive', 'active', 'ts', 'clientid', 'sid']
         return measurements
