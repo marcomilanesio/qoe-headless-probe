@@ -34,6 +34,7 @@ class JSONClient():
     def __init__(self, config):
         self.activetable = config.get_database_configuration()['activetable']
         self.rawtable = config.get_database_configuration()['rawtable']
+        self.summarytable = config.get_database_configuration()['aggregatesummary']
         self.srv_ip = config.get_jsonserver_configuration()['ip']
         self.srv_port = int(config.get_jsonserver_configuration()['port'])
         self.srv_mode = int(config.get_jsonserver_configuration()['mode'])
@@ -48,7 +49,9 @@ class JSONClient():
         return int(r[0][0])
         
     def prepare_data(self):
-        query = 'select * from %s where not sent' % self.activetable
+        #query = 'select * from %s where not sent' % self.activetable
+        query = 'select * from %s where sid in (select sid from %s where not is_sent)' % \
+                (self.activetable, self.summarytable)
         res = self.db.execute_query(query)
         sids = list(set([r[1] for r in res]))
         if len(sids) == 0:
@@ -103,9 +106,10 @@ class JSONClient():
 
         #cleaning
         for sid in sids:
-            q = '''update %s set sent = 't'::bool where sid = %d''' % (self.activetable, sid)
+            q = '''update %s set is_sent = 't'::bool where sid = %d''' % (self.summarytable, sid)
             self.db.execute_update(q)
             logger.debug('Set sent flag on active table.')
+
 
         # measurements is a list of dictionaries
         # one for each session: ['passive', 'active', 'ts', 'clientid', 'sid']

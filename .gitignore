@@ -4,3 +4,5 @@ probe.conf
 *.out
 probe/session_bkp/*
 .idea/*
+probe/thread_*
+session_bkp/*
