@@ -352,10 +352,16 @@ class DBClient:
             if len(res) > 1:
                 logger.warning("Multiple tuples for sid {0}: {1}".format(sid, res))
 
-            dic[str(sid)] = {'server_ip': res[0][0], 'full_load_time': d[sid],
-                             'session_start': res[0][2], 'session_url': res[0][1],
-                             'cpu_percent': res[0][3], 'mem_percent': res[0][4],
-                             'browser': []}
+            try:
+                dic[str(sid)] = {'server_ip': res[0][0], 'full_load_time': d[sid],
+                                 'session_start': res[0][2], 'session_url': res[0][1],
+                                 'cpu_percent': res[0][3], 'mem_percent': res[0][4],
+                                 'browser': []}
+            except IndexError:
+                logger.error(q)
+                logger.error(res)
+                continue
+
 
             q = '''select distinct on (remote_ip) remote_ip, count(*) as cnt, sum(app_rtt) as s_app,
             sum(rcv_time) as s_rcv, sum(body_bytes) as s_body, sum(syn_time) as s_syn from %s where sid = %d
