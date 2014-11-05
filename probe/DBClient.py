@@ -349,6 +349,16 @@ class DBClient:
             where sid = %d and session_url = uri''' % (self.dbconfig['rawtable'], sid)
 
             res = self.execute_query(q)
+
+            if len(res) == 0:  # all uri come from different servers (pisa testbed): something bad happened
+                logger.warning("Unable to find a match session_url = uri in session {0}".format(sid))
+                q = '''select remote_ip, session_url, session_start, cpu_percent, mem_percent from %s
+                where sid = %d''' % (self.dbconfig['rawtable'], sid)
+                res = self.execute_query(q)
+                logger.warning("Found {0} urls relaxing the constraint.".format(len(res)))
+                logger.warning("Session {0} will not be inserted in {1}".format(sid, self.dbconfig['aggregatesummary']))
+                continue
+
             if len(res) > 1:
                 logger.warning("Multiple tuples for sid {0}: {1}".format(sid, res))
 
@@ -361,7 +371,6 @@ class DBClient:
                 logger.error(q)
                 logger.error(res)
                 continue
-
 
             q = '''select distinct on (remote_ip) remote_ip, count(*) as cnt, sum(app_rtt) as s_app,
             sum(rcv_time) as s_rcv, sum(body_bytes) as s_body, sum(syn_time) as s_syn from %s where sid = %d
