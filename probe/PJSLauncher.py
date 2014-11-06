@@ -69,9 +69,10 @@ class BrowserThread(threading.Thread):
 
         thread.join(timeout)
         if thread.is_alive():
-            logger.debug('Timeout expired: terminating process')
+            logger.warning('Timeout expired: terminating process')
             try:
                 self.process.terminate()
+                logger.warning('Terminated.')
             except AttributeError as e:
                 logger.error('Error in browser thread {0} {1}'.format(e.errno, e.strerror))
                 return self.flag, self.mem, self.cpu, True
