@@ -20,12 +20,10 @@
 #
 import socket
 import json
-import numpy
 from DBClient import DBClient
-from Configuration import Configuration 
 from LocalDiagnosisManager import LocalDiagnosisManager
 import logging
-import time
+import collections
 
 logger = logging.getLogger('JSONClient')
 
@@ -35,6 +33,7 @@ class JSONClient():
         self.activetable = config.get_database_configuration()['activetable']
         self.rawtable = config.get_database_configuration()['rawtable']
         self.summarytable = config.get_database_configuration()['aggregatesummary']
+        self.detailtable = config.get_database_configuration()['aggregatedetails']
         self.probeidtable = config.get_database_configuration()['probeidtable']
         self.srv_ip = config.get_jsonserver_configuration()['ip']
         self.srv_port = int(config.get_jsonserver_configuration()['port'])
@@ -48,8 +47,54 @@ class JSONClient():
         r = self.db.execute_query(q)
         assert len(r) == 1
         return int(r[0][0])
-        
+
+    # TODO pyodbc bridge to fetch objects row.sid, row.session_url, etc
     def prepare_data(self):
+        query = '''select sid, session_url, session_start, server_ip,
+        full_load_time, page_dim, cpu_percent, mem_percent from {0} where not is_sent'''.format(self.summarytable)
+        res = self.db.execute_query(query)
+        if len(res) == 0:
+            logger.warning("Nothing to send. All flags are valid.")
+            return
+
+        objects_list = []
+        for row in res:
+            r = collections.OrderedDict()
+            r['sid'] = row[0]
+            r['session_url'] = row[1]
+            r['session_start'] = str(row[2])  # convert to string to be json-serializable
+            r['server_ip'] = row[3]
+            r['full_load_time'] = row[4]
+            r['page_dim'] = row[5]
+            r['cpu_percent'] = row[6]
+            r['mem_percent'] = row[7]
+            r['services'] = []
+
+            query = '''select base_url, ip, netw_bytes, nr_obj, sum_syn, sum_http, sum_rcv_time
+            from {0} where sid = {1}'''.format(self.detailtable, row[0])
+            det = self.db.execute_query(query)
+
+            for det_row in det:
+                d = collections.OrderedDict()
+                d['base_url'] = det_row[0]
+                d['ip'] = det_row[1]
+                d['netw_bytes'] = det_row[2]
+                d['nr_obj'] = det_row[3]
+                d['sum_syn'] = det_row[4]
+                d['sum_http'] = det_row[5]
+                d['sum_rcv_time'] = det_row[6]
+                r['services'].append(d)
+
+            objects_list.append(r)
+
+        j = json.dumps(objects_list)
+        objects_file = 'test.json'
+        f = open(objects_file, 'w')
+        print >> f, j
+        exit()
+
+
+    def old_prepare_data(self):
         #query = 'select * from %s where not sent' % self.activetable
         query = 'select * from %s where sid in (select sid from %s where not is_sent)' % \
                 (self.activetable, self.summarytable)
