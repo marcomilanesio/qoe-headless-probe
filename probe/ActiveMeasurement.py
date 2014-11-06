@@ -228,11 +228,11 @@ class Monitor(object):
                     logger.debug('IP address [%s] already computed, skipping new ping/trace' % ip)
                     c_sid = probed_ip[ip][0]
                     logger.debug("First sid found for IP [{0}] : {1}".format(ip, c_sid))
-                    logger.debug('Found %d measurements. ' % len(tot[c_sid]))
+                    #logger.debug('Found %d measurements. ' % len(tot[c_sid]))
                     ping = tot[c_sid][0]['ping']
-                    logger.debug('Ping for IP [%s] : %s' % (ip, str(ping)))
+                    #logger.debug('Ping for IP [%s] : %s' % (ip, str(ping)))
                     trace = tot[c_sid][0]['trace']
-                    logger.debug('Trace for IP [%s] : %s' % (ip, str(trace)))
+                    #logger.debug('Trace for IP [%s] : %s' % (ip, str(trace)))
                     found = True
                 else:
                     c_sid = sid
@@ -243,7 +243,8 @@ class Monitor(object):
                     logger.debug('Running: %s ' % trace.get_cmd())
                     trace.run()
 
-                logger.debug("sid = {0}, c_sid = {1} (if equals, new IP/session)".format(sid, c_sid))
+                logger.debug("processing sid = {0}, old sid found = {1} (if equals, new IP in sid {0})".format(sid,
+                                                                                                               c_sid))
 
                 if not found:
                     tot[sid].append({'url': url, 'ip': ip, 'ping': ping.get_result(), 'trace': trace.get_result()})

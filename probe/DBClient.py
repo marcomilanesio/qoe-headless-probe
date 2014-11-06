@@ -80,12 +80,13 @@ class DBClient:
 
     def create_idtable(self):
         cursor = self.conn.cursor()
-        cursor.execute('''CREATE TABLE IF NOT EXISTS client_id (probe_id INT4, first_start TEXT)''')
+        cursor.execute('''CREATE TABLE IF NOT EXISTS %s (probe_id INT4, first_start TEXT)''' %
+                       self.dbconfig['probeidtable'])
         self.conn.commit()
 
     def get_clientID(self):
         client_id = 0
-        query = "SELECT probe_id FROM client_id"
+        query = "SELECT probe_id FROM %s " % self.dbconfig['probeidtable']
         res = self.execute_query(query)
         if res != []:
             client_id = int(res[0][0])
@@ -98,7 +99,7 @@ class DBClient:
         client_id = fpformat.fix(random.random()*2147483647, 0)		# int4 range in PgSQL: -2147483648 to +2147483647
         ts = time.time()
         st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
-        state = '''INSERT INTO client_id VALUES ('%s', '%s')'''% (client_id, st)
+        state = '''INSERT INTO probe_id VALUES ('%s', '%s')'''% (client_id, st)
         cursor.execute(state)
         self.conn.commit()
         return client_id
@@ -250,8 +251,8 @@ class DBClient:
         result = {}
         q = '''select distinct a.sid, a.ip, b.session_url
         from %s a, %s b
-        where a.sid = b.sid and not b.is_sent;''' \
-            % (self.dbconfig['aggregatedetails'], self.dbconfig['aggregatesummary'])
+        where a.sid = b.sid and not b.is_sent and b.sid not in (select distinct sid from %s);''' \
+            % (self.dbconfig['aggregatedetails'], self.dbconfig['aggregatesummary'], self.dbconfig['activetable'])
         res = self.execute_query(q)
         for tup in res:
             sid = str(tup[0])
@@ -300,7 +301,7 @@ class DBClient:
                 trace = dic['trace']
                 query = '''INSERT into %s (ip_dest, sid, session_url, remote_ip, ping, trace, sent ) values
                 ('%s', %d, '%s', '%s', '%s','%s', %r) ''' % (self.dbconfig['activetable'],
-                                                         ip_dest, int(sid), url, ip, ping, trace, False)  #TODO remove false on table
+                                                         ip_dest, int(sid), url, ip, ping, trace, True)  #TODO remove false on table
                 cur.execute(query)
             logger.info('inserted active measurements for sid %s: ' % sid)
         self.conn.commit()

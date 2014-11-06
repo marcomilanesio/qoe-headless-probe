@@ -36,7 +36,7 @@ class TstatDaemonThread(threading.Thread):
 
         thread = threading.Thread(target=self.run, args=())
         thread.daemon = self.is_daemon
-        logger.info("TstatDaemonThread running [%s] is_daemon = %s..." % (os.path.basename(self.script), str(self.is_daemon)))
+        logger.debug("TstatDaemonThread running [%s] is_daemon = %s..." % (os.path.basename(self.script), str(self.is_daemon)))
         thread.start()
 
     def run(self):
@@ -70,9 +70,9 @@ if __name__ == '__main__':
         for url_in_file in open(pjs_config['urlfile']):
             url = url_in_file.strip()
             ip_dest = socket.gethostbyname(url)
-            logger.debug('Resolved %s to [%s]' % (url, ip_dest))
+            #logger.debug('Resolved %s to [%s]' % (url, ip_dest))
             stats = launcher.browse_url(url)
-            logger.debug('Received stats: %s' % str(stats))
+            #logger.debug('Received stats: %s' % str(stats))
             if stats is None:
                 logger.warning('Problem in session %d [%s - %s].. skipping' % (i, url, ip_dest))
                 continue
@@ -81,7 +81,7 @@ if __name__ == '__main__':
                 exit("tstat outfile missing. Check your network configuration.")
 
             dbcli.load_to_db(stats)
-            logger.debug('Loaded stats run n.%d for %s' % (i, url))
+            #logger.debug('Loaded stats run n.%d for %s' % (i, url))
             logger.info('Ended browsing run n.%d for %s' % (i, url))
             dbcli.pre_process_raw_table()
 
@@ -99,9 +99,10 @@ if __name__ == '__main__':
                 os.remove(tracefile)
                 #new_fn_trace = backupdir + '/' + tracefile + '.run%d' % i
                 #os.rename(tracefile, new_fn_trace)
+        print ("run {0} done.".format(i))
 
 
-    s = TstatDaemonThread(config, 'stop')
+    s = TstatDaemonThread(config, 'stop')  # TODO check if tstat really quit
     jc = JSONClient(config)
     measurements = jc.prepare_data()
     json_path_fname = jc.save_json_file(measurements)

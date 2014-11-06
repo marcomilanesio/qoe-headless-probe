@@ -35,6 +35,7 @@ class JSONClient():
         self.activetable = config.get_database_configuration()['activetable']
         self.rawtable = config.get_database_configuration()['rawtable']
         self.summarytable = config.get_database_configuration()['aggregatesummary']
+        self.probeidtable = config.get_database_configuration()['probeidtable']
         self.srv_ip = config.get_jsonserver_configuration()['ip']
         self.srv_port = int(config.get_jsonserver_configuration()['port'])
         self.srv_mode = int(config.get_jsonserver_configuration()['mode'])
@@ -58,11 +59,11 @@ class JSONClient():
             logger.info('Nothing to send (all sent flags are valid). Returning...')
             return
         logger.debug('Found %d stored sessions to send... ' % len(sids))
-        sent_sids = []
+        #sent_sids = []
         local_stats = self._prepare_local_data(sids)
-        local_data = {'clientid': self.probeid, 'local': local_stats}
-        str_to_send = "local: " + json.dumps(local_data)
-        logger.debug('str_to_send %s' % str_to_send)
+        #local_data = {'clientid': self.probeid, 'local': local_stats}
+        #str_to_send = "local: " + json.dumps(local_data)
+        #logger.debug('str_to_send %s' % str_to_send)
         measurements = []
         for sid in sids:
             measurements.append({'clientid': self.probeid, 'sid': str(sid),
@@ -92,7 +93,7 @@ class JSONClient():
                 step_nr = step['hop_nr']
                 step_addr = step['ip_addr']
                 step_rtt = step['rtt']
-                step_alias = step['endpoints']
+                #step_alias = step['endpoints']
                 '''
                 @TODO
                 Consider different endpoints
@@ -108,8 +109,7 @@ class JSONClient():
         for sid in sids:
             q = '''update %s set is_sent = 't'::bool where sid = %d''' % (self.summarytable, sid)
             self.db.execute_update(q)
-            logger.debug('Set sent flag on active table.')
-
+            logger.debug('Set sent flag on summary table.')
 
         # measurements is a list of dictionaries
         # one for each session: ['passive', 'active', 'ts', 'clientid', 'sid']
@@ -130,7 +130,7 @@ class JSONClient():
             s.connect((self.srv_ip, self.srv_port))
         except socket.error as e:
             logger.error('Socket error({0}): {1}'.format(e.errno, e.strerror))
-            return
+            return False
 
         data = json.dumps([m for m in measurements])
         logger.info("Sending %d bytes" % len(data))
@@ -138,18 +138,19 @@ class JSONClient():
         result = json.loads(s.recv(1024))
         s.close()
         logger.info("Received %s" % str(result))
-        return self.save_result(result)
+        return True
+    #    return self.save_result(result)
 
-    def save_result(self, result):
-        received_sids = result['sids']
-        if len(received_sids) > 0:
-            for sent_sid in received_sids:
-                update_query = '''update %s set sent = 't' where sid = %d''' % (self.activetable, int(sent_sid))
-                self.db.execute_update(update_query)
-                logger.info('updated sent sid on %s' % self.activetable)
-        else:
-            logger.warning('Unable to send anything to server.')
-        return result
+    #def save_result(self, result):
+    #    received_sids = result['sids']
+    #    if len(received_sids) > 0:
+    #        for sent_sid in received_sids:
+    #            update_query = '''update %s set sent = 't' where sid = %d''' % (self.activetable, int(sent_sid))
+    #            self.db.execute_update(update_query)
+    #            logger.info('updated sent sid on %s' % self.activetable)
+    #    else:
+    #        logger.warning('Unable to send anything to server.')
+    #    return result
 
     def _prepare_local_data(self, sids):
         logger.debug('calling LocalDiagnosisManager for {0}'.format(self.probeid))
