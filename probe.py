@@ -47,6 +47,18 @@ class TstatDaemonThread(threading.Thread):
             p = subprocess.Popen(self.script, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False).wait()
 
 
+def clean_files(bdir, tstat_out, harf, run_nr, sessionurl, error=False):
+    if error:
+        fn = bdir + '/' + tstat_out.split('/')[-1] + '.run%d_%s.error' % (run_nr, sessionurl)
+        os.remove(harf)
+    else:
+        fn = bdir + '/' + tstat_out.split('/')[-1] + '.run%d_%s' % (run_nr, sessionurl)
+        har = bdir + '/' + harf.split('/')[-1] + '.run%d_%s' % (run_nr, sessionurl)
+        os.rename(harf, har)
+    shutil.copyfile(tstat_out, fn)  # Quick and dirty not to delete Tstat log
+    open(tstat_out, 'w').close()
+    return fn
+
 if __name__ == '__main__':
     if len(sys.argv) < 4:
         exit("Usage: %s %s %s %s" % (sys.argv[0], 'nr_runs', 'conf_file', 'backup folder'))
@@ -75,6 +87,8 @@ if __name__ == '__main__':
             #logger.debug('Received stats: %s' % str(stats))
             if stats is None:
                 logger.warning('Problem in session %d [%s - %s].. skipping' % (i, url, ip_dest))
+                # clean temp files
+                clean_files(backupdir, tstat_out_file, harfile, i, url, True)
                 continue
             if not os.path.exists(tstat_out_file):
                 logger.error('tstat outfile missing. Check your network configuration.')
@@ -85,11 +99,12 @@ if __name__ == '__main__':
             logger.info('Ended browsing run n.%d for %s' % (i, url))
             dbcli.pre_process_raw_table()
 
-            new_fn = backupdir + '/' + tstat_out_file.split('/')[-1] + '.run%d_%s' % (i, url)
-            shutil.copyfile(tstat_out_file, new_fn)  # Quick and dirty not to delete Tstat log
-            open(tstat_out_file, 'w').close()
-            new_har = backupdir + '/' + harfile.split('/')[-1] + '.run%d_%s' % (i, url)
-            os.rename(harfile, new_har)
+            new_fn = clean_files(backupdir, tstat_out_file, harfile, i, url)
+            #new_fn = backupdir + '/' + tstat_out_file.split('/')[-1] + '.run%d_%s' % (i, url)
+            #shutil.copyfile(tstat_out_file, new_fn)  # Quick and dirty not to delete Tstat log
+            #open(tstat_out_file, 'w').close()
+            #new_har = backupdir + '/' + harfile.split('/')[-1] + '.run%d_%s' % (i, url)
+            #os.rename(harfile, new_har)
             logger.debug('Saved plugin file for run n.%d: %s' % (i, new_fn))
             monitor = Monitor(config)
             #monitor.do_measure(ip_dest)
@@ -97,8 +112,6 @@ if __name__ == '__main__':
             logger.debug('Ended Active probing for run n.%d to url %s' % (i, url))
             for tracefile in [f for f in os.listdir('.') if f.endswith('.traceroute')]:
                 os.remove(tracefile)
-                #new_fn_trace = backupdir + '/' + tracefile + '.run%d' % i
-                #os.rename(tracefile, new_fn_trace)
         print ("run {0} done.".format(i))
 
 

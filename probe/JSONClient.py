@@ -41,7 +41,7 @@ class JSONClient():
         self.json_file = ".toflume/data_to_send.json"
         self.db = DBClient(config)
         self.probeid = self._get_client_id_from_db()
-    
+
     def _get_client_id_from_db(self):
         q = 'select distinct on (probe_id) probe_id from %s ' % self.rawtable
         r = self.db.execute_query(q)
@@ -57,9 +57,10 @@ class JSONClient():
             logger.warning("Nothing to send. All flags are valid.")
             return
 
-        objects_list = []
+        sessions_list = []
         for row in res:
             r = collections.OrderedDict()
+            r['probeid'] = self.probeid
             r['sid'] = row[0]
             r['session_url'] = row[1]
             r['session_start'] = str(row[2])  # convert to string to be json-serializable
@@ -69,6 +70,7 @@ class JSONClient():
             r['cpu_percent'] = row[6]
             r['mem_percent'] = row[7]
             r['services'] = []
+            r['active_measurements'] = {}
 
             query = '''select base_url, ip, netw_bytes, nr_obj, sum_syn, sum_http, sum_rcv_time
             from {0} where sid = {1}'''.format(self.detailtable, row[0])
@@ -85,14 +87,19 @@ class JSONClient():
                 d['sum_rcv_time'] = det_row[6]
                 r['services'].append(d)
 
-            objects_list.append(r)
+            query = '''select remote_ip, ping, trace
+            from {0} where sid = {1}'''.format(self.activetable, row[0])
+            active = self.db.execute_query(query)
 
-        j = json.dumps(objects_list)
-        objects_file = 'test.json'
-        f = open(objects_file, 'w')
-        print >> f, j
-        exit()
+            for active_row in active:
+                a = collections.OrderedDict()
+                a[active_row[0]] = {'ping': active_row[1], 'trace': active_row[2]}
+                r['active_measurements'].update(a)      # dictionary!
 
+            sessions_list.append(r)
+
+        #j = json.dumps(sessions_list)
+        return sessions_list
 
     def old_prepare_data(self):
         #query = 'select * from %s where not sent' % self.activetable
@@ -165,6 +172,7 @@ class JSONClient():
         # one for each session: ['passive', 'active', 'ts', 'clientid', 'sid']
         logger.info('Saving json file...')
         with open(self.json_file, 'w') as out:
+            #out.write(measurements)
             out.write(json.dumps([m for m in measurements]))
         return self.json_file
 
@@ -183,6 +191,12 @@ class JSONClient():
         result = json.loads(s.recv(1024))
         s.close()
         logger.info("Received %s" % str(result))
+
+        for sid in result['sids']:
+            q = '''update %s set is_sent = 't'::bool where sid = %d''' % (self.summarytable, int(sid))
+            self.db.execute_update(q)
+        logger.debug("Set sent flag on summary table for sids {0}.".format(result['sids']))
+
         return True
     #    return self.save_result(result)
 
