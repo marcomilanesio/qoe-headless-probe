@@ -68,19 +68,24 @@ class BrowserThread(threading.Thread):
         thread.start()
 
         thread.join(timeout)
+        timeout_flag = False
         if thread.is_alive():
             logger.warning('Timeout expired: terminating process')
-            try:
-                self.process.terminate()
-                logger.warning('Terminated.')
-            except AttributeError as e:
-                logger.error('Error in browser thread {0} {1}'.format(e.errno, e.strerror))
-                return self.flag, self.mem, self.cpu, True
-            finally:
-                self.flag = True
-                thread.join()
+            self.process.terminate()
+            logger.warning("retcode: {0}".format(self.process.returncode))
+            thread.join()
+            timeout_flag = True
+            #try:
+            #    self.process.terminate()
+            #    logger.warning('Terminated.')
+            #except AttributeError as e:
+            #    logger.error('Error in browser thread {0} {1}'.format(e.errno, e.strerror))
+            #    return self.flag, self.mem, self.cpu, True
+            #finally:
+            #    self.flag = True
+            #    thread.join()
         
-        return self.flag, self.mem, self.cpu, False
+        return self.flag, self.mem, self.cpu, timeout_flag
                 
 
 class PJSLauncher():
@@ -115,11 +120,13 @@ class PJSLauncher():
         cmdstr = "%s/bin/phantomjs %s %s" % (self.pjs_config['dir'], self.pjs_config['script'], url)
         cmd = BrowserThread(cmdstr, self.pjs_config['thread_outfile'], self.pjs_config['thread_errfile'])
         t = int(self.pjs_config['thread_timeout'])
-        flag, mem, cpu, error = cmd.run(timeout=t)
-        if not error:
-            logger.debug('browserthread {0} {1} {2}'.format(flag, mem, cpu))
-        else:
+        flag, mem, cpu, timeout_flag = cmd.run(timeout=t)
+        if timeout_flag:
             logger.error('Error in browsing thread reported.')
+            return None
+            #logger.debug('browserthread {0} {1} {2}'.format(flag, mem, cpu))
+        #else:
+
         if not flag:
             res['mem'] = mem
             res['cpu'] = cpu
