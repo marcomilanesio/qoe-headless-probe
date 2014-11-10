@@ -27,6 +27,7 @@ import random
 import datetime
 import time
 import json
+from Parser import Parser
 
 logger = logging.getLogger('DBClient')
 
@@ -205,8 +206,10 @@ class DBClient:
         self.create_idtable()
         client_id = self.get_clientID()
         logger.debug("Got client %s" % client_id)
-        datalist = Utils.read_tstatlog(self.dbconfig['tstatfile'], self.dbconfig['harfile'], "\n", client_id)
-        logger.debug("len(datalist) = %d" % len(datalist))
+        p = Parser(self.dbconfig['tstatfile'], self.dbconfig['harfile'], client_id)
+        datalist = p.parse()
+        #datalist = Utils.read_tstatlog(self.dbconfig['tstatfile'], self.dbconfig['harfile'], "\n", client_id)
+        logger.debug("{0} objects to insert ".format(len(datalist)))
         if len(datalist) > 0:
             self.write_plugin_into_db(datalist, stats)
 
@@ -346,15 +349,17 @@ class DBClient:
         logger.debug("{0} session(s) to preprocess: sids {1} ".format(len(d.keys()), d.keys()))
         dic = {}
         for sid in d.keys():
-            q = '''select remote_ip, session_url, session_start, cpu_percent, mem_percent from %s
-            where sid = %d and session_url = uri''' % (self.dbconfig['rawtable'], sid)
+            q = '''select distinct remote_ip, session_url, session_start, cpu_percent, mem_percent from %s
+            where sid = %d and session_url = uri group by remote_ip, session_url, session_start,
+            cpu_percent, mem_percent''' % (self.dbconfig['rawtable'], sid)
 
             res = self.execute_query(q)
 
             if len(res) == 0:  # all uri come from different servers (pisa testbed): something bad happened
                 logger.warning("Unable to find a match session_url = uri in session {0}".format(sid))
-                q = '''select remote_ip, session_url, session_start, cpu_percent, mem_percent from %s
-                where sid = %d''' % (self.dbconfig['rawtable'], sid)
+                q = '''select distinct remote_ip, session_url, session_start, cpu_percent, mem_percent from %s
+                where sid = %d group by remote_ip, session_url, session_start, cpu_percent, mem_percent''' \
+                    % (self.dbconfig['rawtable'], sid)
                 res = self.execute_query(q)
                 logger.warning("Found {0} urls relaxing the constraint.".format(len(res)))
                 logger.warning("Session {0} will not be inserted in {1}".format(sid, self.dbconfig['aggregatesummary']))
