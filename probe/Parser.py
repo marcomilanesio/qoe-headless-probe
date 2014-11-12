@@ -125,6 +125,9 @@ class Parser():
                     elem.update(t_elem)
                     self.merged.append(elem)
 
+        logger.debug("Merged {0} elements so far [t:{1}, h:{2}]...".format(
+            len(self.merged), len(self.tstat_to_process), len(self.har_to_process)))
+
         merged_httpids = [x['httpid'] for x in self.merged]
         for elem in self.har_to_process:
             if elem['httpid'] not in merged_httpids:
