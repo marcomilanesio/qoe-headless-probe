@@ -21,7 +21,9 @@
 import json
 import fpformat
 import os
+import logging
 
+logger = logging.getLogger("Parser")
 
 class Parser():
     def __init__(self, tstatfile, harfile, client_id):
@@ -114,10 +116,9 @@ class Parser():
             self.har_to_process.append(har_metrics)
 
     def merge_to_process(self):
-        print len(self.tstat_to_process)
-        print len(self.har_to_process)
-        print len(self.merged)
-
+        #print len(self.tstat_to_process)
+        #print len(self.har_to_process)
+        #print len(self.merged)
         for elem in self.har_to_process:
             for t_elem in self.tstat_to_process:
                 if elem['httpid'] == t_elem['httpid']:
@@ -130,13 +131,12 @@ class Parser():
                 fake = self._build_fake(elem)
                 self.merged.append(fake)
 
-        print len(self.tstat_to_process)
-        print len(self.har_to_process)
-        print len(self.merged)
-        exit()
+        logger.debug("Got {0} elems from tstat / {1} from har file: returning {2} elems.".format(
+            len(self.tstat_to_process), len(self.har_to_process), len(self.merged)))
+
 
     def _build_fake(self, el):
-        print el
+        logger.warning("Building fake elem: TSTAT did not get all streams.")
         uri = el['uri']
         cur_candidate = self.merged[0]
         max_len = len(os.path.commonprefix([uri, cur_candidate['uri']]))
@@ -144,14 +144,15 @@ class Parser():
             if len(os.path.commonprefix([uri, cur['uri']])) > max_len:
                 max_len = len(os.path.commonprefix([uri, cur['uri']]))
                 cur_candidate = cur
-        print "Candidate: ", cur_candidate
-        return cur_candidate
+        tmp = cur_candidate
+        tmp.update(el)
+        return tmp
 
     def parse(self):
         self.parseTstat()
         self.parseHar()
         self.merge_to_process()
-        #return self.merged
+        return self.merged
 '''
 
     def merge_to_process(self):
