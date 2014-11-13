@@ -177,9 +177,9 @@ class DBClient:
         table_name = self.dbconfig['rawtable']
         insert_query = 'INSERT INTO ' + table_name + ' (%s) values %r RETURNING row_id'
         update_query = 'UPDATE ' + table_name + ' SET mem_percent = %s, cpu_percent = %s where row_id = %d'
-        for obj in datalist:
-            #print obj
-            if obj.has_key("session_url"):
+        for k, obj in datalist.iteritems():
+            if "session_url" in obj.keys():
+            #if obj.has_key("session_url"):
                 url = DBClient._unicode_to_ascii(obj['session_url'])
                 cols = ', '.join(obj)
                 to_execute = insert_query % (cols, tuple(DBClient._convert_to_ascii(obj.values())))
@@ -207,7 +207,13 @@ class DBClient:
         client_id = self.get_clientID()
         logger.debug("Got client %s" % client_id)
         p = Parser(self.dbconfig['tstatfile'], self.dbconfig['harfile'], client_id)
-        datalist = p.parse()
+        datalist, error = p.parse()
+        #print type(datalist)
+        #print error
+        if len(error) > 0:
+            for k in error:
+                del datalist[k]
+                logger.warning("Removed object httpid = {0}".format(k))
         #datalist = Utils.read_tstatlog(self.dbconfig['tstatfile'], self.dbconfig['harfile'], "\n", client_id)
         logger.debug("{0} objects to insert ".format(len(datalist)))
         if len(datalist) > 0:
@@ -244,7 +250,13 @@ class DBClient:
             max_sid += 1
             query = '''update %s set sid = %d where session_start = \'%s\' and probe_id = \'%s\'''' \
                     % (self.dbconfig['rawtable'], max_sid, session_start, clientid)
-            self.execute_update(query)
+            try:
+                self.execute_update(query)
+            except psycopg2.DataError:
+                logger.error(query)
+            finally:
+                self.conn.commit()
+
         return max_sid
 
     def quit_db(self):
@@ -405,7 +417,7 @@ class DBClient:
         return self.insert_to_aggregate(dic)
 
     def insert_to_aggregate(self, pre_processed):
-        logger.debug("received at insert_to_aggregate: {0}".format(pre_processed))
+        logger.debug("received at insert_to_aggregate: {0} sessions".format(len(pre_processed)))
         table_name_summary = self.dbconfig['aggregatesummary']
         table_name_details = self.dbconfig['aggregatedetails']
         stub = 'INSERT INTO ' + table_name_summary + ' (%s) values (%s)'
@@ -431,7 +443,7 @@ class DBClient:
                 logger.error("Integrity Error in insert to aggregate {0}".format(e))
                 continue
             except psycopg2.InternalError as i:
-                logger.error("Internal Error in insert to aggregate {0}".format(e))
+                logger.error("Internal Error in insert to aggregate {0}".format(i))
                 continue
 
             #if reference:

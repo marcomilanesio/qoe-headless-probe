@@ -30,9 +30,11 @@ class Parser():
         self.tstatfile = tstatfile
         self.harfile = harfile
         self.client_id = client_id
-        self.tstat_to_process = []
-        self.har_to_process = []
-        self.merged = []
+        #self.tstat_to_process = []
+        #self.har_to_process = []
+        self.merged = {}
+        self.parsed = {}
+        self.har_dict = {}
 
     def parseTstat(self, separator="\n"):
         log = open(self.tstatfile, 'r')
@@ -52,8 +54,15 @@ class Parser():
                                'remote_ip': line[30],
                                'remote_port': line[31],
                                'httpid': elem}
-                    self.tstat_to_process.append(metrics)
+                    #self.tstat_to_process.append(metrics)
+                    if elem not in self.parsed.keys():
+                        self.parsed[elem] = metrics
+                    else:
+                        logger.warning("parseTstat: Found duplicate: {0}".format(elem))
+                        #print metrics
+                        #print self.parsed[elem]
                 #json_metrics = json_metrics + json.dumps(metrics) + "\n"
+        #print self.parsed
 
     def parseHar(self):
         json_data = open(self.harfile)
@@ -112,9 +121,80 @@ class Parser():
                            unicode('rcv_time'): unicode(receive), unicode('tab_id'): unicode('0'),
                            unicode('ping_gateway'): unicode('0'), unicode('ping_google'): unicode('0'),
                            unicode('annoy'): unicode('0'),
-                           u'httpid': http_id}
-            self.har_to_process.append(har_metrics)
+                           u'httpid': http_id,
+                           'probe_id': unicode(self.client_id)}
 
+            self.har_dict[str(http_id)] = har_metrics
+            #self.har_to_process.append(har_metrics)
+
+    def har_from_tstat(self):
+        logger.debug("Enrich hardic {0} with data from tstatdic {1}".format(len(self.har_dict), len(self.parsed)))
+        for x in self.har_dict.keys():
+            if x in self.parsed.keys():
+                self.har_dict[x].update(self.parsed[x])
+                self.merged[x] = self.har_dict[x]
+                del self.har_dict[x]
+                del self.parsed[x]
+        logger.debug("Enriched {0} entries into merged: remaining {1} from tstat, {2} from har".format(len(self.merged), len(self.parsed), len(self.har_dict)))
+
+    def merge_remaining_tstat(self):
+        new = {}
+        logger.debug("Merging remaining {0} tstat data into merged".format(len(self.parsed)))
+        for httpid, dic in self.parsed.iteritems():
+            remote = dic['remote_ip']
+            #print remote
+            for httpid_merged, dic_merged in self.merged.iteritems():
+                remote_merged = dic_merged['remote_ip']
+                if remote == remote_merged:
+                    tmp = dic_merged
+                    tmp.update(dic)
+                    new[httpid] = tmp
+                    #print "found:", httpid, httpid_merged
+        self.merged.update(new)
+        logger.debug("Enriched {0} data into merged".format(len(self.merged)))
+
+    def merge_remaining_har(self):
+        logger.debug("Merging remaining {0} har data into merged".format(len(self.har_dict)))
+        new = {}
+        for httpid, dic in self.har_dict.iteritems():
+            uri = dic['uri']
+            max_len = 0
+            candidate = {}
+            for httpid_merged, dic_merged in self.merged.iteritems():
+                uri_merged = dic_merged['uri']
+                #print uri_merged
+                prefix = os.path.commonprefix([uri, uri_merged])
+                c_len = prefix.count("/")
+                if c_len >= 3 and c_len > max_len:
+                    candidate = dic_merged
+                    max_len = c_len
+            candidate.update(dic)
+            new[httpid] = candidate
+        self.merged.update(new)
+
+    def merge(self):
+        self.har_from_tstat()
+        logger.debug("{0} from tstat, {1} from har not merged (not present in both)".format(len(self.parsed), len(self.har_dict)))
+        self.merge_remaining_tstat()
+        #print "{0} remaining from tstat".format(len(tstatdic))
+        self.merge_remaining_har()
+        #print "{0} remaining from har".format(len(hardic))
+        #pprint (merged)
+        logger.info("{0} totalsize. {1} new items (found candidates)".format(len(self.merged), len(self.har_dict) - (len(self.har_dict) - len(self.parsed))))
+
+    def parse(self):
+        self.parseTstat()
+        self.parseHar()
+        self.merge()
+        error = []
+        for k, v in self.merged.iteritems():
+            if 'remote_ip' not in v.keys() or v['remote_ip'] == '':
+                logger.error("remote_ip not found {0}: {1}".format(k, v.keys()))
+                error.append(k)
+                continue
+        return self.merged, error
+
+'''
     def merge_to_process(self):
         #print len(self.tstat_to_process)
         #print len(self.har_to_process)
@@ -154,9 +234,10 @@ class Parser():
     def parse(self):
         self.parseTstat()
         self.parseHar()
-        self.merge_to_process()
-        return self.merged
-'''
+        self.merge()
+        #self.merge_to_process()
+        #return self.merged
+
 
     def merge_to_process(self):
         cnt = 0
@@ -182,11 +263,7 @@ class Parser():
                         fake[c] = cur[c]
 
                 self.merged.append(fake)
-    '''
 
-
-
-'''
 def parseTstat(filename, separator, client_id):
     # Read tstat log
     log = open(filename, "r")
