@@ -83,7 +83,12 @@ if __name__ == '__main__':
             url = url_in_file.strip()
             ip_dest = socket.gethostbyname(url)
             #logger.debug('Resolved %s to [%s]' % (url, ip_dest))
-            stats = launcher.browse_url(url)
+            try:
+                stats = launcher.browse_url(url)
+            except AttributeError:
+                logger.error("Problems in browser thread. Aborting session...")
+                browser_error = True
+                break
             #logger.debug('Received stats: %s' % str(stats))
             if stats is None:
                 logger.warning('Problem in session %d [%s - %s].. skipping' % (i, url, ip_dest))
@@ -112,7 +117,13 @@ if __name__ == '__main__':
             logger.debug('Ended Active probing for run n.%d to url %s' % (i, url))
             for tracefile in [f for f in os.listdir('.') if f.endswith('.traceroute')]:
                 os.remove(tracefile)
-        print ("run {0} done.".format(i))
+        else:
+            print ("run {0} done.".format(i))
+            continue
+        # here we go if break in inner loop
+        logger.error("Forcing tstat to stop.")
+        s = TstatDaemonThread(config, 'stop')  # TODO check if tstat really quit
+        exit(1)
 
 
     s = TstatDaemonThread(config, 'stop')  # TODO check if tstat really quit
