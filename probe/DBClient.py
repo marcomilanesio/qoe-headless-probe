@@ -181,6 +181,9 @@ class DBClient:
             if "session_url" in obj.keys():
             #if obj.has_key("session_url"):
                 url = DBClient._unicode_to_ascii(obj['session_url'])
+                if len(url) > 255:
+                    logger.warning("Truncating url.. too long {0}".format(url))
+                    url = url[:254]
                 cols = ', '.join(obj)
                 to_execute = insert_query % (cols, tuple(DBClient._convert_to_ascii(obj.values())))
                 #logger.debug('to_execute: %s' % to_execute)
