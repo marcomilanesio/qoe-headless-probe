@@ -192,7 +192,7 @@ class DBClient:
                     self.conn.commit()
                 except psycopg2.ProgrammingError as e:
                     logger.error(to_execute)
-                    logger.error("psycopg2({0}): {1}".format(e.errno, e.strerror))
+                    logger.error("psycopg2 ({0})".format(e))
                     continue
                 finally:
                     self.conn.commit()
