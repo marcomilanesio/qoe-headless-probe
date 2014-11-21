@@ -94,7 +94,11 @@ class Parser():
             request_url = entry["request"]["url"]
             response_header_size = entry["response"]["headersSize"]
             responde_body_size = entry["response"]["bodySize"]
-            cnt_type = entry["response"]["content"]["mimeType"].split(';')[0]  # e.g. 'text/javascript; charset=UTF-8'
+            try:
+                cnt_type = entry["response"]["content"]["mimeType"].split(';')[0]  # e.g. 'text/javascript; charset=UTF-8'
+            except:
+                logger.error("cnt_type: try to split ( {0} )".format(entry["response"]["content"]["mimeType"]))
+                cnt_type = ''
             # Timing
             blocked = entry["timings"]["blocked"]
             dns = entry["timings"]["dns"]
