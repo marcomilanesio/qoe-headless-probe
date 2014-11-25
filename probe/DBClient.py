@@ -247,9 +247,9 @@ class DBClient:
         order by session_start''' % self.dbconfig['rawtable']
         res = self.execute_query(query)
         logger.debug('Found %d sessions to insert', len(res))
-        for i in range(len(res)):
-            clientid = res[i][0]
-            session_start = res[i][1]
+        for tup in res:
+            clientid = tup[0]
+            session_start = tup[1]
             max_sid += 1
             query = '''update %s set sid = %d where session_start = \'%s\' and probe_id = \'%s\'''' \
                     % (self.dbconfig['rawtable'], max_sid, session_start, clientid)
