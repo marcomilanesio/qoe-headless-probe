@@ -171,9 +171,11 @@ class JSONClient():
         # measurements is a list of dictionaries
         # one for each session: ['passive', 'active', 'ts', 'clientid', 'sid']
         logger.info('Saving json file...')
-        with open(self.json_file, 'w') as out:
+        with open(self.json_file, 'wb') as out:
+            for m in measurements:
+                json.dump(m, out)
             #out.write(measurements)
-            out.write(json.dumps([m for m in measurements]))
+            #out.write(json.dumps([m for m in measurements]))
         return self.json_file
 
     def send_json_to_srv(self, measurements):
