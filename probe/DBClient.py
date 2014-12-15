@@ -267,45 +267,31 @@ class DBClient:
 
     def get_inserted_sid_addresses(self):
         result = {}
-        q = '''select distinct a.sid, a.ip, b.session_url
+        q = '''select distinct a.sid, a.ip, b.server_ip, b.session_url
         from %s a, %s b
         where a.sid = b.sid and not b.is_sent and b.sid not in (select distinct sid from %s);''' \
             % (self.dbconfig['aggregatedetails'], self.dbconfig['aggregatesummary'], self.dbconfig['activetable'])
         res = self.execute_query(q)
         for tup in res:
             sid = str(tup[0])
+            ip = tup[1]
+            server_ip = tup[2]
+            url = tup[3]
             if sid not in result.keys():
-                result[sid] = {'url': tup[2], 'address': [tup[1]]}
-            else:
-                if tup[2] != result[sid]['url']:
-                    logger.error("Misleading url in fetched data.")
-                    logger.error("{0} -> {1}".format(res, tup))
+                result[sid] = {'url': url}
 
-                tmp_addrs = result[sid]['address']
-                tmp_addrs.append(tup[1])
-                result[sid]['address'] = list(set(tmp_addrs))
+            if url != result[sid]['url']:
+                logger.error("Misleading url in fetched data.")
+                logger.error("{0} -> {1}".format(res, tup))
+
+            if ip == server_ip:
+                result[sid].update({'complete': server_ip})
+            else:
+                if 'addresses' not in result[sid].keys():
+                    result[sid]['addresses'] = []
+                result[sid]['addresses'].append(ip)
 
         return result
-
-        #q = '''select distinct on (sid, session_url, remote_ip) sid, session_url, remote_ip
-        #FROM %s where sid not in (select distinct sid from active)''' % self.dbconfig['rawtable']
-        #res = self.execute_query(q)
-        #for tup in res:
-        #    cur_sid = tup[0]
-        #    cur_url = tup[1]
-        #    cur_addr = tup[2]
-        #    if cur_addr == '0.0.0.0':
-        #        continue
-        #    if cur_sid in result.keys():
-        #        if result[cur_sid]['url'] == cur_url:
-        #            result[cur_sid]['address'].append(cur_addr)
-        #        else:
-        #            result[cur_sid]['url'] = cur_url
-        #            result[cur_sid]['address'].append(cur_addr)
-        #    else:
-        #        result[cur_sid] = {'url': cur_url, 'address': [cur_addr]}
-        #print 'result _get_inserted_sid_addresses', result
-        #return result
 
     def insert_active_measurement(self, ip_dest, tot_active_measurement):
         #data['ping'] = json obj
@@ -316,10 +302,16 @@ class DBClient:
                 url = dic['url']
                 ip = dic['ip']
                 ping = dic['ping']
-                trace = dic['trace']
-                query = '''INSERT into %s (ip_dest, sid, session_url, remote_ip, ping, trace, sent ) values
-                ('%s', %d, '%s', '%s', '%s','%s', %r) ''' % (self.dbconfig['activetable'],
-                                                         ip_dest, int(sid), url, ip, ping, trace, True)  #TODO remove false on table
+                if 'trace' in dic.keys():
+                    trace = dic['trace']
+                    query = '''INSERT into %s (ip_dest, sid, session_url, remote_ip, ping, trace, sent ) values
+                    ('%s', %d, '%s', '%s', '%s','%s', %r) ''' % (self.dbconfig['activetable'], ip_dest, int(sid), url,
+                                                                 ip, ping, trace, True)  # TODO remove false on table
+                else:
+                    query = '''INSERT into %s (ip_dest, sid, session_url, remote_ip, ping, sent ) values
+                    ('%s', %d, '%s', '%s', '%s', %r) ''' % (self.dbconfig['activetable'], ip_dest, int(sid), url,
+                                                                 ip, ping, True)  # TODO remove false on table
+
                 cur.execute(query)
             logger.info('inserted active measurements for sid %s: ' % sid)
         self.conn.commit()

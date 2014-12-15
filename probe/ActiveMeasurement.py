@@ -209,53 +209,58 @@ class Monitor(object):
         self.inserted_sid = self.db.get_inserted_sid_addresses()
         logger.info('Started active monitor: %d session(s).' % len(self.inserted_sid))
 
-    # TODO as for now ip_dest is not used
-    def run_active_measurement(self, ip_dest):
+    def run_active_measurement(self):
         tot = {}
         probed_ip = {}
         for sid, dic in self.inserted_sid.iteritems():
+            url = dic['url']
+            server_ip = dic['complete']
+            ip_addrs = list(set(dic['addresses']))  # remove possible duplicates
+
             if sid not in tot.keys():
                 tot[sid] = []
-            url = dic['url']
-            ip_addrs = dic['address']
-            for ip in ip_addrs:
-                found = False
-                if ip not in probed_ip.keys():
-                    probed_ip[ip] = []
-                probed_ip[ip].append(sid)
 
-                if len(probed_ip[ip]) > 1:
-                    logger.debug('IP address [%s] already computed, skipping new ping/trace' % ip)
-                    c_sid = probed_ip[ip][0]
-                    logger.debug("First sid found for IP [{0}] : {1}".format(ip, c_sid))
-                    #logger.debug('Found %d measurements. ' % len(tot[c_sid]))
-                    ping = tot[c_sid][0]['ping']
-                    #logger.debug('Ping for IP [%s] : %s' % (ip, str(ping)))
-                    trace = tot[c_sid][0]['trace']
-                    #logger.debug('Trace for IP [%s] : %s' % (ip, str(trace)))
-                    found = True
-                else:
-                    c_sid = sid
-                    ping = Ping(ip)
-                    trace = Traceroute(ip)
-                    logger.debug('Running: %s ' % ping.get_cmd())
-                    ping.run()
-                    logger.debug('Running: %s ' % trace.get_cmd())
-                    trace.run()
+            if server_ip not in probed_ip.keys():
+                logger.debug("Running ping for {0}".format(server_ip))
+                ping = Ping(server_ip)
+                ping.run()
+                ping_result = ping.get_result()
+                logger.debug("Running traceroute for {0}".format(server_ip))
+                trace = Traceroute(server_ip)
+                trace.run()
+                trace_result = trace.get_result()
 
-                logger.debug("processing sid = {0}, old sid found = {1} (if equals, new IP in sid {0})".format(sid,
-                                                                                                               c_sid))
+                tot[sid].append({'url': url, 'ip': server_ip, 'ping': ping_result, 'trace': trace_result})
+                probed_ip[server_ip] = {'ping': ping_result, 'trace': trace_result}
 
-                if not found:
-                    tot[sid].append({'url': url, 'ip': ip, 'ping': ping.get_result(), 'trace': trace.get_result()})
-                else:
-                    tot[sid].append({'url': url, 'ip': ip, 'ping': ping, 'trace': trace})
+            else:
+                tot[sid].append({'url': url, 'ip': server_ip, 'ping': probed_ip[server_ip]['ping'],
+                                 'trace': probed_ip[server_ip]['trace']})
 
-                probed_ip[ip].append(sid)
-                logger.info("Computed Active Measurement for {0} in session {1}".format(ip, sid))
+            res, done = self.check_ipaddrs(url, ip_addrs, probed_ip)
+            for k, v in done.iteritems():
+                probed_ip[k] = v
+            for d in res:
+                tot[sid].append(d)
 
-        self.db.insert_active_measurement(ip_dest, tot)
+            logger.info("Computed Active Measurement for {0} [{1}] in session {2}".format(url, server_ip, sid))
+
+        self.db.insert_active_measurement(server_ip, tot)
         logger.info('ping and traceroute saved into db.')
+
+    def check_ipaddrs(self, url, ip_addrs, probed_ip):
+        res = []
+        done = {}
+        for ip in ip_addrs:
+            if ip not in probed_ip.keys():
+                ping = Ping(ip)
+                logger.debug("Running ping for ip : {0}".format(ip))
+                ping.run()
+                res.append({'url': url, 'ip': ip, 'ping': ping.get_result()})
+                done[ip] = {'ping': ping}
+            else:
+                res.append({'url': url, 'ip': ip, 'ping': probed_ip[ip]['ping']})
+        return res, done
 
     def do_measure(self, ip_dest):
         for sid, dic in self.inserted_sid.iteritems():

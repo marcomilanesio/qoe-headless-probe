@@ -81,7 +81,7 @@ if __name__ == '__main__':
     for i in range(nun_runs):
         for url_in_file in open(pjs_config['urlfile']):
             url = url_in_file.strip()
-            ip_dest = socket.gethostbyname(url)
+            #ip_dest = socket.gethostbyname(url)
             #logger.debug('Resolved %s to [%s]' % (url, ip_dest))
             try:
                 stats = launcher.browse_url(url)
@@ -113,7 +113,7 @@ if __name__ == '__main__':
             logger.debug('Saved plugin file for run n.%d: %s' % (i, new_fn))
             monitor = Monitor(config)
             #monitor.do_measure(ip_dest)
-            monitor.run_active_measurement(ip_dest)
+            monitor.run_active_measurement()
             logger.debug('Ended Active probing for run n.%d to url %s' % (i, url))
             for tracefile in [f for f in os.listdir('.') if f.endswith('.traceroute')]:
                 os.remove(tracefile)
