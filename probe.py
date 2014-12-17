@@ -73,8 +73,7 @@ if __name__ == '__main__':
     launcher = PJSLauncher(config)    
     
     logger.debug('Backup dir set at: %s' % backupdir)
-    dbcli = DBClient(config)
-    dbcli.create_tables()
+    dbcli = DBClient(config, create=True)
     logger.debug('Starting nr_runs (%d)' % nun_runs)
     pjs_config = config.get_phantomjs_configuration()
     t = TstatDaemonThread(config, 'start')

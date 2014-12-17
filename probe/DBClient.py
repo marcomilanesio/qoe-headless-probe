@@ -33,18 +33,22 @@ logger = logging.getLogger('DBClient')
 
 
 class DBClient:
-    def __init__(self, config):
+    def __init__(self, config, create=False):
         #connect to the database
         self.dbconfig = config.get_database_configuration()
         try:
             self.conn = psycopg2.connect(database=self.dbconfig['dbname'], user=self.dbconfig['dbuser'])
             logger.debug('DB connection established')
+            if create:
+                self.create_tables()
+                logger.debug('Tables created')
         except psycopg2.DatabaseError, e:
             print 'Unable to connect to DB. Error %s' % e
             logger.error('Unable to connect to DB. Error %s' % e)
             sys.exit(1)
 
     def create_tables(self):
+        self.create_idtable()
         self.create_plugin_table()
         self.create_activemeasurement_table()
         self.create_aggregate_tables()
@@ -177,7 +181,10 @@ class DBClient:
         table_name = self.dbconfig['rawtable']
         insert_query = 'INSERT INTO ' + table_name + ' (%s) values %r RETURNING row_id'
         update_query = 'UPDATE ' + table_name + ' SET mem_percent = %s, cpu_percent = %s where row_id = %d'
+        httpid_inserted = []  # FIXME keep track of duplicates
         for k, obj in datalist.iteritems():
+            if obj['httpid'] in httpid_inserted:
+                continue
             if "session_url" in obj.keys():
             #if obj.has_key("session_url"):
                 url = DBClient._unicode_to_ascii(obj['session_url'])
@@ -203,10 +210,11 @@ class DBClient:
                 if not row_id:
                     logger.error('Unable to update %s' % to_update)
 
+                httpid_inserted.append(obj['httpid'])
+
         self._generate_sid_on_table()
         
     def load_to_db(self, stats):
-        self.create_idtable()
         client_id = self.get_clientID()
         logger.debug("Got client %s" % client_id)
         p = Parser(self.dbconfig['tstatfile'], self.dbconfig['harfile'], client_id)
@@ -293,27 +301,30 @@ class DBClient:
 
         return result
 
-    def insert_active_measurement(self, ip_dest, tot_active_measurement):
+    #def insert_active_measurement(self, ip_dest, tot_active_measurement):
+    def insert_active_measurement(self, sid, ip_dest, to_insert_list):
         #data['ping'] = json obj
         #data['trace'] = json obj
         cur = self.conn.cursor()
-        for sid, data in tot_active_measurement.iteritems():
-            for dic in data:
-                url = dic['url']
-                ip = dic['ip']
-                ping = dic['ping']
-                if 'trace' in dic.keys():
-                    trace = dic['trace']
-                    query = '''INSERT into %s (ip_dest, sid, session_url, remote_ip, ping, trace, sent ) values
-                    ('%s', %d, '%s', '%s', '%s','%s', %r) ''' % (self.dbconfig['activetable'], ip_dest, int(sid), url,
-                                                                 ip, ping, trace, True)  # TODO remove false on table
-                else:
-                    query = '''INSERT into %s (ip_dest, sid, session_url, remote_ip, ping, sent ) values
-                    ('%s', %d, '%s', '%s', '%s', %r) ''' % (self.dbconfig['activetable'], ip_dest, int(sid), url,
-                                                                 ip, ping, True)  # TODO remove false on table
+        #for sid, data in tot_active_measurement.iteritems():
+        #for dic in data:
+        for dic in to_insert_list:
+            url = dic['url']
+            ip = dic['ip']
+            ping = dic['ping']
+            if 'trace' in dic.keys():
+                trace = dic['trace']
+                query = '''INSERT into %s (ip_dest, sid, session_url, remote_ip, ping, trace, sent ) values
+                ('%s', %d, '%s', '%s', '%s','%s', %r) ''' % (self.dbconfig['activetable'], ip_dest, int(sid), url,
+                                                             ip, ping, trace, True)  # TODO remove false on table
+            else:
+                query = '''INSERT into %s (ip_dest, sid, session_url, remote_ip, ping, sent ) values
+                ('%s', %d, '%s', '%s', '%s', %r) ''' % (self.dbconfig['activetable'], ip_dest, int(sid), url,
+                                                             ip, ping, True)  # TODO remove false on table
 
-                cur.execute(query)
-            logger.info('inserted active measurements for sid %s: ' % sid)
+            cur.execute(query)
+        logger.info('inserted active measurements for sid %s: ' % sid)
+        cur.close()
         self.conn.commit()
     
     def get_table_names(self):

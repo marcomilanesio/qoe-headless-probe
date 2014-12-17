@@ -136,6 +136,13 @@ class Traceroute(Measure):
     def get_result(self):
         return self.result
 
+    def get_first_hops(self, hop_limit=3):
+        res = {}
+        for hop in json.loads(self.result):
+            if hop['hop_nr'] <= hop_limit:
+                res[hop['hop_nr']] = hop['ip_addr']
+        return res
+
 
 class TracerouteIcmp(Traceroute):
     def __init__(self, script, host, maxttl=32):
@@ -213,6 +220,7 @@ class Monitor(object):
         tot = {}
         probed_ip = {}
         for sid, dic in self.inserted_sid.iteritems():
+            to_insert = []
             url = dic['url']
             server_ip = dic['complete']
             ip_addrs = list(set(dic['addresses']))  # remove possible duplicates
@@ -230,22 +238,37 @@ class Monitor(object):
                 trace.run()
                 trace_result = trace.get_result()
 
-                tot[sid].append({'url': url, 'ip': server_ip, 'ping': ping_result, 'trace': trace_result})
+                to_insert.append({'url': url, 'ip': server_ip, 'ping': ping_result, 'trace': trace_result})
+                #tot[sid].append({'url': url, 'ip': server_ip, 'ping': ping_result, 'trace': trace_result})
                 probed_ip[server_ip] = {'ping': ping_result, 'trace': trace_result}
 
+                for k, v in trace.get_first_hops().iteritems():
+                    if v != 'n.a.':
+                        p = Ping(v)
+                        p.run()
+                        p_result = p.get_result()
+                        probed_ip[v] = {'ping': p_result}
+                        to_insert.append({'url': url, 'ip': v, 'ping': p_result})
+                    else:
+                        logger.warning("Hop {0} not available".format(k))
+
             else:
-                tot[sid].append({'url': url, 'ip': server_ip, 'ping': probed_ip[server_ip]['ping'],
-                                 'trace': probed_ip[server_ip]['trace']})
+                to_insert.append({'url': url, 'ip': server_ip, 'ping': probed_ip[server_ip]['ping'],
+                                  'trace': probed_ip[server_ip]['trace']})
+                #tot[sid].append({'url': url, 'ip': server_ip, 'ping': probed_ip[server_ip]['ping'],
+                #                 'trace': probed_ip[server_ip]['trace']})
 
             res, done = self.check_ipaddrs(url, ip_addrs, probed_ip)
             for k, v in done.iteritems():
                 probed_ip[k] = v
             for d in res:
-                tot[sid].append(d)
+                to_insert.append(d)
+                #tot[sid].append(d)
 
             logger.info("Computed Active Measurement for {0} [{1}] in session {2}".format(url, server_ip, sid))
 
-        self.db.insert_active_measurement(server_ip, tot)
+            #self.db.insert_active_measurement(sid, server_ip, tot)
+            self.db.insert_active_measurement(sid, server_ip, to_insert)
         logger.info('ping and traceroute saved into db.')
 
     def check_ipaddrs(self, url, ip_addrs, probed_ip):
