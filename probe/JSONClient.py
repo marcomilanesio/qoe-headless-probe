@@ -43,7 +43,7 @@ class JSONClient():
         self.probeid = self._get_client_id_from_db()
 
     def _get_client_id_from_db(self):
-        q = 'select distinct on (probe_id) probe_id from %s ' % self.rawtable
+        q = 'select distinct on (probe_id) probe_id from %s ' % self.probeidtable
         r = self.db.execute_query(q)
         assert len(r) == 1
         return int(r[0][0])
