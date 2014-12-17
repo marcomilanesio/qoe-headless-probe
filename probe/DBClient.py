@@ -328,7 +328,9 @@ class DBClient:
         self.conn.commit()
     
     def get_table_names(self):
-        return {'raw': self.dbconfig['rawtable'], 'active': self.dbconfig['activetable']}
+        return {'rawtable': self.dbconfig['rawtable'], 'activetable': self.dbconfig['activetable'],
+                'summarytable': self.dbconfig['aggregatesummary'], 'detailstable': self.dbconfig['aggregatedetails'],
+                'probeidtable': self.dbconfig['probeidtable']}
 
     def force_update_full_load_time(self, sid):
         q = '''select session_start, end_time from %s where sid = %d''' % (self.dbconfig['rawtable'], sid)

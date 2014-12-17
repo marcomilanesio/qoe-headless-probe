@@ -15,6 +15,7 @@ import subprocess
 import threading
 import socket
 import tarfile
+from probe.LocalDiagnosisManager import LocalDiagnosisManager
 
 logging.config.fileConfig('logging.conf')
 
@@ -116,6 +117,8 @@ if __name__ == '__main__':
             logger.debug('Ended Active probing for run n.%d to url %s' % (i, url))
             for tracefile in [f for f in os.listdir('.') if f.endswith('.traceroute')]:
                 os.remove(tracefile)
+            #l = LocalDiagnosisManager(dbcli)
+            #l.do_local_diagnosis(url)
         else:
             print ("run {0} done.".format(i))
             continue
