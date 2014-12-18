@@ -22,6 +22,8 @@ import json
 import fpformat
 import os
 import logging
+import datetime
+
 
 logger = logging.getLogger("Parser")
 
@@ -64,11 +66,70 @@ class Parser():
                 #json_metrics = json_metrics + json.dumps(metrics) + "\n"
         #print self.parsed
 
-    def parseHar(self):
-        json_data = open(self.harfile)
-        data = json.load(json_data)
+    @staticmethod
+    def get_datetime(harstr):
+        datetimestr = harstr.replace("T", " ")[:harstr.replace("T", " ").rfind("-")]
+        return unicode(datetime.datetime.strptime(datetimestr, '%Y-%m-%d %H:%M:%S.%f'))
 
-         # Global metrics of the session
+    def parseHar(self):
+        with open(self.harfile) as hf:
+            json_data = json.load(hf)
+
+        data = json_data['log']
+        page = data['pages'][0]
+        session_url = page['id']
+        session_start = Parser.get_datetime(page["startedDateTime"])
+        full_load_time = page["pageTimings"]["onLoad"]
+        logger.info("Found {0} objects on in the har file.".format(len(data['entries'])))
+        self.har_dict = {unicode('session_url'): session_url,
+                          unicode('probe_id'): self.client_id,
+                          unicode('session_start'): session_start,
+                          unicode('full_load_time'): full_load_time,
+                          unicode('entries'): None}
+        har_metrics = {}
+        for entry in data['entries']:
+            request_ts = Parser.get_datetime(entry["startedDateTime"])
+            firstByte = Parser.get_datetime(entry["TimeToFirstByte"])
+            end_ts = Parser.get_datetime(entry["endtimeTS"])
+
+            request = entry['request']
+            url = request['url']
+            for header in request['headers']:
+                if header['name'] == "httpid":
+                    httpid = header['value']
+
+            if not httpid:
+                logger.error("Unable to find httpid in Har file: skipping {0}".format(url))
+                continue
+
+            response = entry['response']
+            content = response['content']
+            size = content['size']
+            mime = content['mimeType'].split(";")[0]  # eliminate charset utf-8 from text
+
+            #timings = entry['timings']
+            #wait = timings['wait']
+            #receive = timings['receive']
+            #time = wait + receive
+            time = entry['time']
+
+            #har_metrics = {unicode('session_url'): session_url, unicode('full_load_time'): unicode(full_load_time),
+            #               unicode('uri'): url, unicode('request_ts'): request_ts, unicode('content_type'): mime,
+            #               unicode('session_start'): session_start, unicode('body_bytes'): unicode(size),
+            #               unicode('first_bytes_rcv'): unicode(firstByte), unicode('end_time'): unicode(end_ts),
+            #               unicode('rcv_time'): unicode(time), unicode('tab_id'): unicode('0'),
+            #               unicode('httpid'): httpid,
+            #               unicode('probe_id'): unicode(self.client_id)}
+            har_metrics[str(httpid)] = {unicode('uri'): url, unicode('request_ts'): request_ts,
+                                        unicode('content_type'): mime, unicode('body_bytes'): unicode(size),
+                                        unicode('first_bytes_rcv'): unicode(firstByte),
+                                        unicode('end_time'): unicode(end_ts), unicode('rcv_time'): unicode(time)}
+
+
+            self.har_dict['entries'] = har_metrics
+
+        '''
+        # Global metrics of the session
         version = data["log"]["creator"]["version"]
         session_url = data["log"]["entries"][0]["request"]["url"]  # session_url is the url of the first request
         session_start = data["log"]["pages"][0]["startedDateTime"].replace('T', ' ')[0:-1]
@@ -130,6 +191,7 @@ class Parser():
 
             self.har_dict[str(http_id)] = har_metrics
             #self.har_to_process.append(har_metrics)
+            '''
 
     def har_from_tstat(self):
         logger.debug("Enrich hardic {0} with data from tstatdic {1}".format(len(self.har_dict), len(self.parsed)))
@@ -187,8 +249,11 @@ class Parser():
         logger.info("{0} totalsize. {1} new items (found candidates)".format(len(self.merged), len(self.har_dict) - (len(self.har_dict) - len(self.parsed))))
 
     def parse(self):
-        self.parseTstat()
         self.parseHar()
+        from pprint import pprint
+        pprint(self.har_dict)
+        exit()
+        self.parseTstat()
         self.merge()
         error = []
         for k, v in self.merged.iteritems():
@@ -378,15 +443,15 @@ def updatebyHar(tstatdata, filename):
     print missing_from_tstat
     return tstatdata
 
-
+'''
 if __name__ == '__main__':
     import os
-    tstatfile = './session_bkp/07-11-14_15:31:25/log_own_complete.run0_www.google.com'
-    harfile = './session_bkp/07-11-14_15:31:25/phantomjs.har.run0_www.google.com'
-    p = Parser(tstatfile, harfile, 1608989979)
-    p.parseTstat()
-    p.parseHar()
-    p.merge_to_process()
+    harfile = '/tmp/phantomjs.har'
+    p = Parser(None, harfile, 1608989979)
+    p.parse()
+    #p.parseTstat()
+    #p.parseHar()
+    #p.merge_to_process()
     #arr = parseTstat(tstatfile, '\n', 1608989979)
     #rows = []
     #for line in arr:
@@ -397,4 +462,3 @@ if __name__ == '__main__':
     #        pass  # EOF
     #full_rows = updatebyHar(rows, harfile)
     #add_missing_from_har(full_rows, harfile)
-'''
