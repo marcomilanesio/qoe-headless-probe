@@ -23,7 +23,6 @@ import json
 import re
 import logging
 import numpy
-from DBClient import DBClient
 
 logger = logging.getLogger('Active')
 
@@ -210,9 +209,9 @@ class TracerouteHop(object):
 
 
 class Monitor(object):
-    def __init__(self, config):
+    def __init__(self, config, dbconn):
         self.config = config
-        self.db = DBClient(config)
+        self.db = dbconn
         self.inserted_sid = self.db.get_inserted_sid_addresses()
         logger.info('Started active monitor: %d session(s).' % len(self.inserted_sid))
 

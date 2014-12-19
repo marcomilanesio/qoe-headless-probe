@@ -83,10 +83,9 @@ class Parser():
             self.har_dict['entries'][k].update(metrics)
 
         if matches:
-            logger.info("Data ingested from similar objects (most similar uri).")
+            logger.info("{0} objects ingested from similar objects (most similar uri).".format(len(matches)))
         else:
             logger.info("No data ingested.")
-
 
     @staticmethod
     def get_datetime(harstr):

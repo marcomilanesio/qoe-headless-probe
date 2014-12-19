@@ -55,7 +55,7 @@ class LocalDiagnosisManager():
         default = "('{0}', {1}, {2}, {3}, {4}, {5}, {6}, {7}, {8})".format(self.url, flt, http, tcp, dim,
                                                                            t1, d1, d2, dh)
         q = "{0}{1}".format(template, default)
-        self.dbconn.execute_update(q)
+        self.dbconn.execute(q)
         return {'full_load_time_th': flt, 'http_th': http, 'tcp_th': tcp, 'dim_th': dim,
                 't1': t1, 'd1': d1, 'd2': d2, 'dh': dh}
 
@@ -64,14 +64,14 @@ class LocalDiagnosisManager():
         q = '''select sid, session_start, server_ip, full_load_time, page_dim, cpu_percent, mem_percent
         from {0} where sid in (select max(sid) from {0} where session_url like '%{1}%')
         '''.format(self.dbconn.get_table_names()['summarytable'], self.url)
-        res = self.dbconn.execute_query(q)
+        res = self.dbconn.execute(q)
         assert len(res) == 1
         session = res[0]
         sid, starttime, servip, flt, dim, cpu, mem = session
 
         q = '''select base_url, ip, netw_bytes, sum_syn, sum_http, sum_rcv_time
         from {0} where sid = {1};'''.format(self.dbconn.get_table_names()['detailstable'], sid)
-        res = self.dbconn.execute_query(q)
+        res = self.dbconn.execute(q)
         details = {}
         for tup in res:
             baseurl, ip, netw, syn, http, rcv = tup
@@ -79,7 +79,7 @@ class LocalDiagnosisManager():
 
         q = '''select remote_ip, ping, trace from {0} where sid = {1}'''\
             .format(self.dbconn.get_table_names()['activetable'], sid)
-        res = self.dbconn.execute_query(q)
+        res = self.dbconn.execute(q)
         active = {}
         for tup in res:
             ip, ping, trace = tup
@@ -138,7 +138,7 @@ class LocalDiagnosisManager():
         else:
             q += ')t'
         
-        res = self.dbconn.execute_query(q)
+        res = self.dbconn.execute(q)
         return res
     
     def _get_client_idle_time(self, sid):
@@ -168,7 +168,7 @@ class LocalDiagnosisManager():
     def _get_http_response_time(self, sid):
         q = '''select app_rtt from %s where sid = %d and full_load_time > -1'''\
             % (self.dbconn.get_table_names()['raw'], sid)
-        res = self.dbconn.execute_query(q)
+        res = self.dbconn.execute(q)
         logger.debug('{0}'.format(res))
         app_rtts = [r[0] for r in res]
         http_res_time = -1
@@ -183,7 +183,7 @@ class LocalDiagnosisManager():
     def _get_page_downloading_time(self, sid):
         q = '''select distinct full_load_time from %s where sid = %d and full_load_time > -1 group by full_load_time'''\
             % (self.dbconn.get_table_names()['raw'], sid)
-        res = self.dbconn.execute_query(q)
+        res = self.dbconn.execute(q)
         page_down = -1
         if len(res) == 0:
             logger.warning('_get_page_downloading_time got 0 results')
@@ -195,14 +195,14 @@ class LocalDiagnosisManager():
     def _get_dns_response_time(self, sid):
         q = '''select remote_ip, dns_time from %s where sid = %d and dns_time > 0 and full_load_time > -1'''\
             % (self.dbconn.get_table_names()['raw'], sid)
-        res = self.dbconn.execute_query(q)
+        res = self.dbconn.execute(q)
         #resolved_ips = [r[0] for r in res]
         dns_times = [float(r[1]) for r in sorted(res, key=lambda time: time[1])]
         return sum(dns_times)  #msec
 
     def _get_tcp_response_time(self, sid):
         q = 'select syn_time from %s where sid = %d and full_load_time > -1' % (self.dbconn.get_table_names()['raw'], sid)
-        res = self.dbconn.execute_query(q)
+        res = self.dbconn.execute(q)
         tcp_times = [r[0] for r in res]
         tcp_resp = -1
         if len(tcp_times) == 0:
@@ -216,7 +216,7 @@ class LocalDiagnosisManager():
         # header_bytes missing in phantomJS
         q = '''SELECT sum(header_bytes + body_bytes) as netw_bytes, count(*) as nr_netw_obj
             from %s where sid = %d and full_load_time > -1''' % (self.dbconn.get_table_names()['raw'], sid)
-        res = self.dbconn.execute_query(q)
+        res = self.dbconn.execute(q)
         assert len(res) == 1
         if res[0][0] is not None:
             tot_bytes = int(res[0][0])
@@ -229,7 +229,7 @@ class LocalDiagnosisManager():
     def _get_os_stats(self, sid):
         q = '''select distinct on(cpu_percent, mem_percent) cpu_percent, mem_percent from %s where sid = %d'''\
             % (self.dbconn.get_table_names()['raw'], sid)
-        res = self.dbconn.execute_query(q)
+        res = self.dbconn.execute(q)
         r = [-1, -1]
         if len(res) != 1:
             logger.error('multiple sessions with sid = %d' % sid)
@@ -245,7 +245,7 @@ class LocalDiagnosisManager():
     def _get_ip_dest(self, sid):
         q = '''select distinct ip_dest, count(*) as cnt from %s where sid = %d group by ip_dest order by cnt desc''' % \
             (self.dbconn.get_table_names()['active'], sid)
-        res = self.dbconn.execute_query(q)
+        res = self.dbconn.execute(q)
         if len(res) == 0:
             logger.error("No destination ip found for sid {0}".format(sid))
             ip_dest = -1

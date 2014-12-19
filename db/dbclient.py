@@ -32,7 +32,7 @@ class DBClient():
 
     def get_probe_id(self):
         query = "SELECT probe_id FROM %s " % self.config['probeidtable']
-        _, res = self.conn.execute_query(query)
+        res = self.conn.execute_query(query)
         if res:
             return int(res[0][0])
         else:
@@ -57,8 +57,8 @@ class DBClient():
 
     def write_plugin_into_db(self, session_dic, stats):
         table_name = self.config['rawtable']
-        insert_query = 'INSERT INTO ' + table_name + ' (%s) values (%s)'
-        update_query = 'UPDATE ' + table_name + ' SET mem_percent = %s, cpu_percent = %s where row_id = %d'
+        insert_query = 'INSERT OR IGNORE INTO ' + table_name + ' (%s) values (%s)'
+        update_query = 'UPDATE ' + table_name + ' SET mem_percent = %d, cpu_percent = %d where rowid = %d'
         httpid_inserted = []  # FIXME keep track of duplicates
 
         session_url = session_dic['session_url']
@@ -68,6 +68,8 @@ class DBClient():
 
         entries = session_dic['entries']
         for httpid, obj in entries.iteritems():
+            if httpid in httpid_inserted:
+                continue
             uri = obj['uri']
             first_bytes_rcv = obj['first_bytes_rcv']
             rcv_time = obj['rcv_time']
@@ -82,34 +84,34 @@ class DBClient():
             content_type = obj['content_type']
             body_bytes = obj['body_bytes']
 
+            mem = int(stats[session_url]['mem'])
+            cpu = int(stats[session_url]['cpu'])
+
             if len(uri) > 255:
                 logger.warning("Truncating uri: {0}".format(uri))
                 uri = uri[:254]
 
             cols = '''httpid, session_url, session_start, probe_id, full_load_time, uri, first_bytes_rcv, rcv_time,
             local_port, local_ip, remote_port, remote_ip, syn_time, app_rtt, request_ts, end_time, content_type,
-            body_bytes'''
+            body_bytes, cpu_percent, mem_percent'''
 
             values = '''{0}, '{1}', '{2}', {3}, {4}, '{5}',
             '{6}', {7}, {8}, '{9}', {10}, '{11}',
-            {12}, {13}, '{14}', '{15}', '{16}', {17}
+            {12}, {13}, '{14}', '{15}', '{16}', {17},
+            {18}, {19}
             '''.format(httpid, session_url, session_start, probe_id, full_load_time, uri,
                        first_bytes_rcv, rcv_time, local_port, local_ip, remote_port, remote_ip,
-                       syn_time, app_rtt, request_ts, end_time, content_type, body_bytes)
+                       syn_time, app_rtt, request_ts, end_time, content_type, body_bytes,
+                       cpu, mem)
 
             to_execute = insert_query % (cols, values)
 
             try:
                 row_id = self.conn.execute_query(to_execute)
-                to_update = update_query % (stats[session_url]['mem'], stats[session_url]['cpu'], row_id)
-                self.conn.execute_query(to_execute)
             except sqlite3.Error as e:
                 logger.error(to_execute)
                 logger.error("sqlite3 ({0})".format(e))
                 continue
-
-            if not row_id:
-                logger.error("Unable to update: {0}".format(to_update))
 
             httpid_inserted.append(httpid)
 
@@ -117,7 +119,7 @@ class DBClient():
 
     def _generate_sid_on_table(self):
         q = "select max(sid) from {0}".format(self.config['rawtable'])
-        _, res = self.conn.execute_query(q)
+        res = self.conn.execute_query(q)
         max_sid = 0
         if res[0] != (None,):
             max_sid = int(res[0][0])
@@ -131,7 +133,7 @@ class DBClient():
             session_start = tup[1]
             max_sid += 1
             query = '''update {0} set sid = {1} where
-            session_start = {2} and probe_id = {3}'''.format(self.config['rawtable'], max_sid, session_start, probe_id)
+            session_start = '{2}' and probe_id = {3}'''.format(self.config['rawtable'], max_sid, session_start, probe_id)
             try:
                 self.conn.execute_query(query)
             except sqlite3.Error:
@@ -142,8 +144,9 @@ class DBClient():
         q = '''select distinct a.sid, a.ip, b.server_ip, b.session_url
         from {0} a, {1} b
         where a.sid = b.sid and not b.is_sent
-        and b.sid not in (select distinct sid from {3});'''\
+        and b.sid not in (select distinct sid from {2});'''\
             .format(self.config['aggregatedetails'], self.config['aggregatesummary'], self.config['activetable'])
+
         res = self.conn.execute_query(q)
         for tup in res:
             sid = str(tup[0])
@@ -175,11 +178,11 @@ class DBClient():
             ping = dic['ping']
             if 'trace' in dic.keys():
                 trace = dic['trace']
-                query = '''INSERT into %s (ip_dest, sid, session_url, remote_ip, ping, trace) values
+                query = '''INSERT OR IGNORE into %s (ip_dest, sid, session_url, remote_ip, ping, trace) values
                 ('%s', %d, '%s', '%s', '%s','%s') ''' % (self.config['activetable'], ip_dest, int(sid), url,
                                                          ip, ping, trace)
             else:
-                query = '''INSERT into %s (ip_dest, sid, session_url, remote_ip, ping) values
+                query = '''INSERT OR IGNORE into %s (ip_dest, sid, session_url, remote_ip, ping) values
                 ('%s', %d, '%s', '%s', '%s') ''' % (self.config['activetable'], ip_dest, int(sid), url, ip, ping)
 
             self.conn.execute_query(query)
@@ -195,9 +198,10 @@ class DBClient():
         # TODO: page_dim as sum of netw_bytes in summary
         logger.info('Pre-processing data from raw table...')
         # eliminate redirection (e.g., http://www.google.fr/?gfe_rd=cr&ei=W8c_VLu9OcjQ8geqsIGQDA)
-        q = '''SELECT DISTINCT sid, full_load_time FROM %s GROUP BY sid, full_load_time HAVING COUNT(sid) > 1
-        and sid not in (select distinct sid from %s)''' % \
-            (self.config['rawtable'], self.config['aggregatesummary'])
+        q = '''select distinct sid, full_load_time from {0}
+            where sid not in (select distinct sid from {1})
+            group by sid, full_load_time
+            having count(sid) > 1'''.format(self.config['rawtable'], self.config['aggregatesummary'])
         res = self.conn.execute_query(q)
         if len(res) == 0:
             logger.warning('pre_process: no sids found')
@@ -236,7 +240,7 @@ class DBClient():
                 logger.error(res)
                 continue
 
-            q = '''select distinct on (remote_ip) remote_ip, count(*) as cnt, sum(app_rtt) as s_app,
+            q = '''select distinct remote_ip, count(*) as cnt, sum(app_rtt) as s_app,
             sum(rcv_time) as s_rcv, sum(body_bytes) as s_body, sum(syn_time) as s_syn from %s where sid = %d
             group by remote_ip;''' % (self.config['rawtable'], sid)
             res = self.conn.execute_query(q)
@@ -276,14 +280,16 @@ class DBClient():
             ip = obj['server_ip']
             cpu_percent = obj['cpu_percent']
             mem_percent = obj['mem_percent']
-            q = stub % ('sid, session_url, session_start, full_load_time, page_dim, server_ip, cpu_percent, '
-                        'mem_percent, is_sent', "%d, '%s', '%s', %d, %d, '%s', %d, %d, %r" %
-                        (int(sid), url, start, flt, page_dim, ip, cpu_percent, mem_percent, False))
-
+            q = stub % ('''sid, session_url, session_start, full_load_time,
+            page_dim, server_ip, cpu_percent, mem_percent, is_sent''',
+                        "{0}, '{1}', '{2}', {3}, {4}, '{5}', {6}, {7}, {8}".format(int(sid), url, start, flt,
+                                                                                   page_dim, ip,
+                                                                                   cpu_percent, mem_percent, 0))
             try:
                 self.conn.execute_query(q)
             except sqlite3.Error as e:
                 logger.error("Error in insert to aggregate {0}".format(e))
+                logger.error(q)
                 continue
 
             #if reference:
@@ -294,8 +300,15 @@ class DBClient():
                                                                 dic['sum_syn'], dic['sum_http'],
                                                                 dic['sum_rcv_time'])
                 q = stub2 % (s, v)
-                self.conn.execute_query(q)
+                try:
+                    self.conn.execute_query(q)
+                except sqlite3.Error as e:
+                    logger.error("Error in insert to aggregate {0}".format(e))
+                    logger.error(q)
+                    continue
 
         logger.info('Aggregate tables populated.')
         return True
 
+    def execute(self, query):
+        return self.conn.execute_query(query)

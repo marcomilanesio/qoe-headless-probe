@@ -10,7 +10,7 @@ create_raw_table = '''CREATE TABLE IF NOT EXISTS {0} (
             local_port int,
             remote_ip text,
             remote_port int,
-            body_bytes int
+            body_bytes int,
             syn_time int,
             first_bytes_rcv datetime,
             app_rtt int,
@@ -20,7 +20,8 @@ create_raw_table = '''CREATE TABLE IF NOT EXISTS {0} (
             cpu_percent int,
             mem_percent int,
             probe_id int8,
-            sid int
+            sid int,
+            unique(sid, httpid)
         )
         '''
 create_active_table = '''CREATE TABLE IF NOT EXISTS {0} (
@@ -29,11 +30,12 @@ create_active_table = '''CREATE TABLE IF NOT EXISTS {0} (
             session_url text,
             remote_ip text,
             ping blob,
-            trace blob
+            trace blob,
+            unique(sid, remote_ip)
             )
         '''
 create_aggregate_summary = '''CREATE TABLE IF NOT EXISTS {0} (
-            sid INT,
+            sid INT unique,
             session_url TEXT,
             session_start datetime,
             server_ip TEXT,
@@ -51,10 +53,11 @@ create_aggregate_details = '''CREATE TABLE IF NOT EXISTS {0} (
             nr_obj INT,
             sum_syn INT,
             sum_http INT,
-            sum_rcv_time INT
+            sum_rcv_time INT,
+            unique(sid, base_url, ip)
         ) '''
 create_local_diagnosis = '''CREATE TABLE IF NOT EXISTS {0} (
-            url TEXT,
+            url TEXT unique,
             flt INT,
             http INT,
             tcp INT,

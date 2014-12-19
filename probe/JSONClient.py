@@ -20,7 +20,6 @@
 #
 import socket
 import json
-from DBClient import DBClient
 from LocalDiagnosisManager import LocalDiagnosisManager
 import logging
 import collections
@@ -29,7 +28,7 @@ logger = logging.getLogger('JSONClient')
 
 
 class JSONClient():
-    def __init__(self, config):
+    def __init__(self, config, dbcli):
         self.activetable = config.get_database_configuration()['activetable']
         self.rawtable = config.get_database_configuration()['rawtable']
         self.summarytable = config.get_database_configuration()['aggregatesummary']
@@ -39,12 +38,12 @@ class JSONClient():
         self.srv_port = int(config.get_jsonserver_configuration()['port'])
         self.srv_mode = int(config.get_jsonserver_configuration()['mode'])
         self.json_file = ".toflume/data_to_send.json"
-        self.db = DBClient(config)
+        self.db = dbcli
         self.probeid = self._get_client_id_from_db()
 
     def _get_client_id_from_db(self):
-        q = 'select distinct on (probe_id) probe_id from %s ' % self.probeidtable
-        r = self.db.execute_query(q)
+        q = "select distinct probe_id from {0}".format(self.probeidtable)
+        r = self.db.execute(q)
         assert len(r) == 1
         return int(r[0][0])
 
@@ -52,7 +51,7 @@ class JSONClient():
     def prepare_data(self):
         query = '''select sid, session_url, session_start, server_ip,
         full_load_time, page_dim, cpu_percent, mem_percent from {0} where not is_sent'''.format(self.summarytable)
-        res = self.db.execute_query(query)
+        res = self.db.execute(query)
         if len(res) == 0:
             logger.warning("Nothing to send. All flags are valid.")
             return
@@ -74,7 +73,7 @@ class JSONClient():
 
             query = '''select base_url, ip, netw_bytes, nr_obj, sum_syn, sum_http, sum_rcv_time
             from {0} where sid = {1}'''.format(self.detailtable, row[0])
-            det = self.db.execute_query(query)
+            det = self.db.execute(query)
 
             for det_row in det:
                 d = collections.OrderedDict()
@@ -89,7 +88,7 @@ class JSONClient():
 
             query = '''select remote_ip, ping, trace
             from {0} where sid = {1}'''.format(self.activetable, row[0])
-            active = self.db.execute_query(query)
+            active = self.db.execute(query)
 
             for active_row in active:
                 a = collections.OrderedDict()
@@ -105,7 +104,7 @@ class JSONClient():
         #query = 'select * from %s where not sent' % self.activetable
         query = 'select * from %s where sid in (select sid from %s where not is_sent)' % \
                 (self.activetable, self.summarytable)
-        res = self.db.execute_query(query)
+        res = self.db.execute(query)
         sids = list(set([r[1] for r in res]))
         if len(sids) == 0:
             logger.info('Nothing to send (all sent flags are valid). Returning...')
@@ -195,9 +194,9 @@ class JSONClient():
         logger.info("Received %s" % str(result))
 
         for sid in result['sids']:
-            q = '''update %s set is_sent = 't'::bool where sid = %d''' % (self.summarytable, int(sid))
+            q = '''update %s set is_sent = 1 where sid = %d''' % (self.summarytable, int(sid))
             self.db.execute_update(q)
-        logger.debug("Set sent flag on summary table for sids {0}.".format(result['sids']))
+        logger.debug("Set is_sent flag on summary table for sids {0}.".format(result['sids']))
 
         return True
     #    return self.save_result(result)

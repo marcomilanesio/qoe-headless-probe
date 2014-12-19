@@ -101,7 +101,6 @@ if __name__ == '__main__':
             #logger.debug('Loaded stats run n.%d for %s' % (i, url))
             logger.info('Ended browsing run n.%d for %s' % (i, url))
             dbcli.pre_process_raw_table()
-            exit()
             new_fn = clean_files(backupdir, tstat_out_file, harfile, i, url)
 
             #new_fn = backupdir + '/' + tstat_out_file.split('/')[-1] + '.run%d_%s' % (i, url)
@@ -110,14 +109,14 @@ if __name__ == '__main__':
             #new_har = backupdir + '/' + harfile.split('/')[-1] + '.run%d_%s' % (i, url)
             #os.rename(harfile, new_har)
             logger.debug('Saved plugin file for run n.%d: %s' % (i, new_fn))
-            monitor = Monitor(config)
+            monitor = Monitor(config, dbcli)
             #monitor.do_measure(ip_dest)
             monitor.run_active_measurement()
             logger.debug('Ended Active probing for run n.%d to url %s' % (i, url))
             for tracefile in [f for f in os.listdir('.') if f.endswith('.traceroute')]:
                 os.remove(tracefile)
-            l = LocalDiagnosisManager(dbcli, url)
-            l.do_local_diagnosis()
+            #l = LocalDiagnosisManager(dbcli, url)
+            #l.do_local_diagnosis()
         else:
             print ("run {0} done.".format(i))
             continue
@@ -127,7 +126,7 @@ if __name__ == '__main__':
         exit(1)
 
     s = TstatDaemonThread(config, 'stop')  # TODO check if tstat really quit
-    jc = JSONClient(config)
+    jc = JSONClient(config, dbcli)
     measurements = jc.prepare_data()
     json_path_fname = jc.save_json_file(measurements)
     jc.send_json_to_srv(measurements)
