@@ -91,7 +91,7 @@ if __name__ == '__main__':
                 break
             #logger.debug('Received stats: %s' % str(stats))
             if stats is None:
-                logger.warning('Problem in session %d [%s - %s].. skipping' % (i, url, ip_dest))
+                logger.warning('Problem in session %d [%s].. skipping' % (i, url))
                 # clean temp files
                 clean_files(backupdir, tstat_out_file, harfile, i, url, True)
                 continue
@@ -105,6 +105,7 @@ if __name__ == '__main__':
             dbcli.pre_process_raw_table()
 
             new_fn = clean_files(backupdir, tstat_out_file, harfile, i, url)
+
             #new_fn = backupdir + '/' + tstat_out_file.split('/')[-1] + '.run%d_%s' % (i, url)
             #shutil.copyfile(tstat_out_file, new_fn)  # Quick and dirty not to delete Tstat log
             #open(tstat_out_file, 'w').close()
@@ -117,8 +118,8 @@ if __name__ == '__main__':
             logger.debug('Ended Active probing for run n.%d to url %s' % (i, url))
             for tracefile in [f for f in os.listdir('.') if f.endswith('.traceroute')]:
                 os.remove(tracefile)
-            #l = LocalDiagnosisManager(dbcli)
-            #l.do_local_diagnosis(url)
+            l = LocalDiagnosisManager(dbcli, url)
+            l.do_local_diagnosis()
         else:
             print ("run {0} done.".format(i))
             continue
@@ -126,7 +127,6 @@ if __name__ == '__main__':
         logger.error("Forcing tstat to stop.")
         s = TstatDaemonThread(config, 'stop')  # TODO check if tstat really quit
         exit(1)
-
 
     s = TstatDaemonThread(config, 'stop')  # TODO check if tstat really quit
     jc = JSONClient(config)

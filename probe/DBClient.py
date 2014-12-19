@@ -52,6 +52,7 @@ class DBClient:
         self.create_plugin_table()
         self.create_activemeasurement_table()
         self.create_aggregate_tables()
+        self.create_local_diagnosis_table()
 
     def create_aggregate_tables(self):
         cursor = self.conn.cursor()
@@ -108,6 +109,21 @@ class DBClient:
         cursor.execute(state)
         self.conn.commit()
         return client_id
+
+    def create_local_diagnosis_table(self):
+        cursor = self.conn.cursor()
+        cursor.execute('''CREATE TABLE IF NOT EXISTS %s (
+        url TEXT,
+        flt INT,
+        http INT,
+        tcp INT,
+        dim INT,
+        t1 FLOAT,
+        d1 FLOAT,
+        d2 FLOAT,
+        dh FLOAT
+        )''' % self.dbconfig['localdiagnosistable'])
+        self.conn.commit()
 
     def create_plugin_table(self):
         #create a Table for the Firefox plugin
@@ -175,42 +191,68 @@ class DBClient:
             res.append(DBClient._unicode_to_ascii(i))
         return res
 
-    def write_plugin_into_db(self, datalist, stats):
-        #read json objects from each line of the plugin file
+    def write_plugin_into_db(self, session_dic, stats):
         cursor = self.conn.cursor()
         table_name = self.dbconfig['rawtable']
-        insert_query = 'INSERT INTO ' + table_name + ' (%s) values %r RETURNING row_id'
+        insert_query = 'INSERT INTO ' + table_name + ' (%s) values (%s) RETURNING row_id'
         update_query = 'UPDATE ' + table_name + ' SET mem_percent = %s, cpu_percent = %s where row_id = %d'
         httpid_inserted = []  # FIXME keep track of duplicates
-        for k, obj in datalist.iteritems():
-            if obj['httpid'] in httpid_inserted:
+
+        session_url = session_dic['session_url']
+        session_start = session_dic['session_start']
+        probe_id = session_dic['probe_id']
+        full_load_time = session_dic['full_load_time']
+
+        entries = session_dic['entries']
+        for httpid, obj in entries.iteritems():
+            uri = obj['uri']
+            first_bytes_rcv = obj['first_bytes_rcv']
+            rcv_time = obj['rcv_time']
+            local_port = obj['local_port']
+            local_ip = obj['local_ip']
+            remote_port = obj['remote_port']
+            remote_ip = obj['remote_ip']
+            syn_time = obj['syn_time']
+            app_rtt = obj['app_rtt']
+            request_ts = obj['request_ts']
+            end_time = obj['end_time']
+            content_type = obj['content_type']
+            body_bytes = obj['body_bytes']
+
+            if len(uri) > 255:
+                logger.warning("Truncating uri: {0}".format(uri))
+                uri = uri[:254]
+
+            cols = '''httpid, session_url, session_start, probe_id, full_load_time, uri, first_bytes_rcv, rcv_time,
+            local_port, local_ip, remote_port, remote_ip, syn_time, app_rtt, request_ts, end_time, content_type,
+            body_bytes'''
+
+            values = '''{0}, '{1}', '{2}', {3}, {4}, '{5}',
+            '{6}', {7}, {8}, '{9}', {10}, '{11}',
+            {12}, {13}, '{14}', '{15}', '{16}', {17}
+            '''.format(httpid, session_url, session_start, probe_id, full_load_time, uri,
+                       first_bytes_rcv, rcv_time, local_port, local_ip, remote_port, remote_ip,
+                       syn_time, app_rtt, request_ts, end_time, content_type, body_bytes)
+
+            to_execute = insert_query % (cols, values)
+
+            try:
+                cursor.execute(to_execute)
+                row_id = cursor.fetchone()[0]
+                to_update = update_query % (stats[session_url]['mem'], stats[session_url]['cpu'], row_id)
+                cursor.execute(to_update)
+                self.conn.commit()
+            except psycopg2.ProgrammingError as e:
+                logger.error(to_execute)
+                logger.error("psycopg2 ({0})".format(e))
                 continue
-            if "session_url" in obj.keys():
-            #if obj.has_key("session_url"):
-                url = DBClient._unicode_to_ascii(obj['session_url'])
-                if len(url) > 255:
-                    logger.warning("Truncating url.. too long {0}".format(url))
-                    url = url[:254]
-                cols = ', '.join(obj)
-                to_execute = insert_query % (cols, tuple(DBClient._convert_to_ascii(obj.values())))
-                #logger.debug('to_execute: %s' % to_execute)
-                try:
-                    cursor.execute(to_execute)
-                    row_id = cursor.fetchone()[0]
-                    to_update = update_query % (stats[url]['mem'], stats[url]['cpu'], row_id)
-                    cursor.execute(to_update)
-                    self.conn.commit()
-                except psycopg2.ProgrammingError as e:
-                    logger.error(to_execute)
-                    logger.error("psycopg2 ({0})".format(e))
-                    continue
-                finally:
-                    self.conn.commit()
+            finally:
+                self.conn.commit()
 
-                if not row_id:
-                    logger.error('Unable to update %s' % to_update)
+            if not row_id:
+                logger.error('Unable to update %s' % to_update)
 
-                httpid_inserted.append(obj['httpid'])
+            httpid_inserted.append(httpid)
 
         self._generate_sid_on_table()
         
@@ -218,17 +260,8 @@ class DBClient:
         client_id = self.get_clientID()
         logger.debug("Got client %s" % client_id)
         p = Parser(self.dbconfig['tstatfile'], self.dbconfig['harfile'], client_id)
-        datalist, error = p.parse()
-        #print type(datalist)
-        #print error
-        if len(error) > 0:
-            for k in error:
-                del datalist[k]
-                logger.warning("Removed object httpid = {0}".format(k))
-        #datalist = Utils.read_tstatlog(self.dbconfig['tstatfile'], self.dbconfig['harfile'], "\n", client_id)
-        logger.debug("{0} objects to insert ".format(len(datalist)))
-        if len(datalist) > 0:
-            self.write_plugin_into_db(datalist, stats)
+        to_insert = p.parse()
+        self.write_plugin_into_db(to_insert, stats)
 
     def execute_query(self, query):
         cur = self.conn.cursor()
@@ -330,7 +363,8 @@ class DBClient:
     def get_table_names(self):
         return {'rawtable': self.dbconfig['rawtable'], 'activetable': self.dbconfig['activetable'],
                 'summarytable': self.dbconfig['aggregatesummary'], 'detailstable': self.dbconfig['aggregatedetails'],
-                'probeidtable': self.dbconfig['probeidtable']}
+                'probeidtable': self.dbconfig['probeidtable'],
+                'localdiagnosistable': self.dbconfig['localdiagnosistable']}
 
     def force_update_full_load_time(self, sid):
         q = '''select session_start, end_time from %s where sid = %d''' % (self.dbconfig['rawtable'], sid)

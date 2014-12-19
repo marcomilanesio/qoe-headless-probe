@@ -18,37 +18,107 @@
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-from DBClient import DBClient
 import logging
 
 logger = logging.getLogger('LocalDiagnosisManager')
 
 
 class LocalDiagnosisManager():
-    def __init__(self, dbconn, clientid, sids):
-        self.dbconn = dbconn
-        self.sids = sids
-        self.clientid = clientid
-        logger.debug('LocalDiagnosisManager started.')
-    
+    def __init__(self, db, url):
+        self.dbconn = db
+        self.url = url
+        self.localdata = self.get_local_diagnosis_data()
+        logger.debug("LocalDiagnosisManager started for {0}".format(self.url))
+
+    def get_local_diagnosis_data(self):
+        q = '''select flt, http, tcp, dim, t1, d1, d2, dh
+        from {0} where url like '%{1}%' '''.format(self.dbconn.get_table_names()['localdiagnosistable'], self.url)
+        try:
+            res = self.dbconn.execute_query(q)
+            data = res[0]
+            return {'full_load_time_th': data[0], 'http_th': data[1], 'tcp_th': data[2], 'dim_th': data[3],
+                    't1': data[4], 'd1': data[5], 'd2': data[6], 'dh': data[7]}
+        except:
+            return None
+
+    def insert_first_time(self, flt, http, tcp, dim):
+        flt += 1000
+        http += 500
+        tcp += 500
+        dim += 300000
+        t1 = 0.1
+        d1 = 3
+        d2 = 3
+        dh = 500
+        template = '''insert into {0} (url, flt, http, tcp, dim, t1, d1, d2, dh) values '''\
+            .format(self.dbconn.get_table_names()['localdiagnosistable'])
+        default = "('{0}', {1}, {2}, {3}, {4}, {5}, {6}, {7}, {8})".format(self.url, flt, http, tcp, dim,
+                                                                           t1, d1, d2, dh)
+        q = "{0}{1}".format(template, default)
+        self.dbconn.execute_update(q)
+        return {'full_load_time_th': flt, 'http_th': http, 'tcp_th': tcp, 'dim_th': dim,
+                't1': t1, 'd1': d1, 'd2': d2, 'dh': dh}
+
     def do_local_diagnosis(self):
         res = {}
-        logger.debug('Found {0} sids.'.format(len(self.sids)))
-        for sid in self.sids:
-            session_start, idletime = self._get_client_idle_time(sid)
-            #logger.debug("session start {0}".format(session_start))
-            httpresp = self._get_http_response_time(sid)
-            pagedown = self._get_page_downloading_time(sid)
-            dnsresp = self._get_dns_response_time(sid)
-            tcpresp = self._get_tcp_response_time(sid)
-            pagedim = self._get_page_dimension(sid)
-            osstats = self._get_os_stats(sid)
-            ip_dest = self._get_ip_dest(sid)
-            res[str(sid)] = {'ip_dest': ip_dest, 'idle': idletime, 'http': httpresp, 'tcp': tcpresp, 'tot': pagedown,
-                             'dns': dnsresp, 'dim': pagedim, 'osstats': osstats, 'start': session_start}
-            logger.debug("do_local_diagnosis for sid {0}: {1}".format(sid, res))
-        return res
-         
+        q = '''select sid, session_start, server_ip, full_load_time, page_dim, cpu_percent, mem_percent
+        from {0} where sid in (select max(sid) from {0} where session_url like '%{1}%')
+        '''.format(self.dbconn.get_table_names()['summarytable'], self.url)
+        res = self.dbconn.execute_query(q)
+        assert len(res) == 1
+        session = res[0]
+        sid, starttime, servip, flt, dim, cpu, mem = session
+
+        q = '''select base_url, ip, netw_bytes, sum_syn, sum_http, sum_rcv_time
+        from {0} where sid = {1};'''.format(self.dbconn.get_table_names()['detailstable'], sid)
+        res = self.dbconn.execute_query(q)
+        details = {}
+        for tup in res:
+            baseurl, ip, netw, syn, http, rcv = tup
+            details[ip] = {'baseurl': baseurl, 'netw': netw, 'syn': syn, 'http': http, 'rcv': rcv}
+
+        q = '''select remote_ip, ping, trace from {0} where sid = {1}'''\
+            .format(self.dbconn.get_table_names()['activetable'], sid)
+        res = self.dbconn.execute_query(q)
+        active = {}
+        for tup in res:
+            ip, ping, trace = tup
+            active[ip] = {'ping': ping}
+            if trace is not None:
+                active[ip].update({'trace': trace})
+
+        return self.run_diagnosis(session, details, active)
+
+    def run_diagnosis(self, session_dic, details_dic, active_dic):
+        sid, starttime, servip, flt, dim, cpu, mem = session_dic
+        http_times = [dic['http'] for ip, dic in details_dic.iteritems()]
+        tcp_times = [dic['syn'] for ip, dic in details_dic.iteritems()]
+
+        if self.localdata is None:  # first time we hit the url
+            self.insert_first_time(flt, sum(http_times), sum(tcp_times), dim)
+
+        self.localdata = self.get_local_diagnosis_data()
+
+        cpu_th = mem_th = 50
+
+        if flt < self.localdata['full_load_time_th']:
+            logger.info("{0} = No problem".format(self.url))
+            return
+
+        if cpu > cpu_th or mem > mem_th:
+            logger.info("{0} = Local probe overloaded".format(self.url))
+            return
+        if sum(http_times) < self.localdata['http_th']:
+            if dim > self.localdata['dim_th']:
+                logger.info("{0} = Page too big".format(self.url))
+            elif sum(tcp_times) > self.localdata['tcp_th']:
+                logger.info("{0} = Web server too far".format(self.url))
+            else:
+                logger.info("{0} = Network generic".format(self.url))
+            return
+        else:
+            logger.info("{0} = Network generic".format(self.url))
+
     def _execute_obj_start_end_query(self, sid, full_load_time=True):
         q = '''select session_start, obj_start, obj_end, httpid, host,
             extract(minute from obj_start-session_start)*60*1000+extract(millisecond from obj_start-session_start) as relative_start, 
