@@ -2,20 +2,18 @@
 import sys
 import os
 import shutil
-import logging
-import logging.config
-from probe.Configuration import Configuration
-from probe.PJSLauncher import PJSLauncher
-from probe.DBClient import DBClient
-from probe.ActiveMeasurement import Monitor
-from probe.JSONClient import JSONClient
-#from probe.TstatLiveCapture import TstatLiveCapture
-#import time
 import subprocess
 import threading
-import socket
 import tarfile
+import logging
+import logging.config
+
+from probe.Configuration import Configuration
+from probe.PJSLauncher import PJSLauncher
+from probe.ActiveMeasurement import Monitor
+from probe.JSONClient import JSONClient
 from probe.LocalDiagnosisManager import LocalDiagnosisManager
+from db.dbclient import DBClient
 
 logging.config.fileConfig('logging.conf')
 
@@ -103,7 +101,7 @@ if __name__ == '__main__':
             #logger.debug('Loaded stats run n.%d for %s' % (i, url))
             logger.info('Ended browsing run n.%d for %s' % (i, url))
             dbcli.pre_process_raw_table()
-
+            exit()
             new_fn = clean_files(backupdir, tstat_out_file, harfile, i, url)
 
             #new_fn = backupdir + '/' + tstat_out_file.split('/')[-1] + '.run%d_%s' % (i, url)
