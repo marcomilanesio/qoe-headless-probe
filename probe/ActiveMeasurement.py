@@ -250,7 +250,7 @@ class Monitor(object):
                         probed_ip[v] = {'ping': p_result}
                         to_insert.append({'url': url, 'ip': v, 'ping': p_result})
                     else:
-                        logger.warning("Hop {0} not available".format(k))
+                        logger.warning("Hop {0} [{1}] not answering to ping".format(k, v))
 
             else:
                 to_insert.append({'url': url, 'ip': server_ip, 'ping': probed_ip[server_ip]['ping'],
