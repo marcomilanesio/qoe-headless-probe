@@ -199,7 +199,6 @@ class JSONClient():
         logger.debug("Set is_sent flag on summary table for sids {0}.".format(result['sids']))
 
         return True
-    #    return self.save_result(result)
 
     #def save_result(self, result):
     #    received_sids = result['sids']
