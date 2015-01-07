@@ -195,7 +195,7 @@ class JSONClient():
 
         for sid in result['sids']:
             q = '''update %s set is_sent = 1 where sid = %d''' % (self.summarytable, int(sid))
-            self.db.execute_update(q)
+            self.db.execute(q)
         logger.debug("Set is_sent flag on summary table for sids {0}.".format(result['sids']))
 
         return True
