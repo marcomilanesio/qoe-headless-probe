@@ -1,7 +1,7 @@
-qoe-probe
+mplane qoe headless probe
 =========
 
-mplane qoe headless probe
+ qoe headless probe
 
 pre-requisites
 ==============
