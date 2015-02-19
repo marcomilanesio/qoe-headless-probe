@@ -1,37 +1,51 @@
-import fpformat
 import random
 import datetime
 import time
 import logging
 import sqlite3
+import json
 
-from dbconnector import DBConnector
-from createqueries import *
+from .dbconnector import DBConnector
+import db.createqueries as cq
 from probe.Parser import Parser
+import sys
 
 logger = logging.getLogger('DBClient')
 
 
 class DBClient():
 
-    def __init__(self, configuration, create=False):
-        self.config = configuration.get_database_configuration()
-        self.conn = DBConnector(self.config['dbfile'])
+    def __init__(self, configuration, loc_info, create=False):
+        self.dbconfig = configuration.get_database_configuration()
+        self.conn = DBConnector(self.dbconfig['dbfile'])
+        self.loc_info = loc_info
+        self.tables = {'raw': self.dbconfig['table_raw'],
+                       'active': self.dbconfig['table_active'],
+                       'probe': self.dbconfig['table_probe'],
+                       'aggr_sum': self.dbconfig['table_aggr_sum'],
+                       'aggr_det': self.dbconfig['table_aggr_det'],
+                       'diag_values': self.dbconfig['table_diag_values'],
+                       'diag_result': self.dbconfig['table_diag_result']}
         if create:
             self.create_tables()
 
     def create_tables(self):
-        q = [create_id_table.format(self.config['probeidtable']),
-             create_raw_table.format(self.config['rawtable']),
-             create_active_table.format(self.config['activetable']),
-             create_aggregate_summary.format(self.config['aggregatesummary']),
-             create_aggregate_details.format(self.config['aggregatedetails']),
-             create_local_diagnosis.format(self.config['localdiagnosistable'])]
+        q = [cq.create_id_table.format(self.tables['probe']),
+             cq.create_raw_table.format(self.tables['raw']),
+             cq.create_active_table.format(self.tables['active']),
+             cq.create_aggregate_summary.format(self.tables['aggr_sum']),
+             cq.create_aggregate_details.format(self.tables['aggr_det']),
+             cq.create_local_diagnosis.format(self.tables['diag_values']),
+             cq.create_local_diagnosis_result.format(self.tables['diag_result'])]
         for query in q:
-            self.conn.execute_query(query)
+            try:
+                self.conn.execute_query(query)
+            except sqlite3.OperationalError:
+                logger.error(query)
+                sys.exit(1)
 
     def get_probe_id(self):
-        query = "SELECT probe_id FROM %s " % self.config['probeidtable']
+        query = "SELECT probe_id FROM %s " % self.tables['probe']
         res = self.conn.execute_query(query)
         if res:
             return int(res[0][0])
@@ -40,23 +54,26 @@ class DBClient():
 
     def _create_probe_id(self):
         ran = 2**31 - 1  # int4
-        probe_id = fpformat.fix(random.random()*ran, 0)
+        probe_id = int(random.random()*ran)
         ts = time.time()
         st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
-        user = self.config['user']
-        q = "INSERT INTO probe_id VALUES ('{0}', {1}, '{2}')".format(user, probe_id, st)
+        user = self.dbconfig['user']
+        for k in ['city', 'region']:
+            self.loc_info.update({k: self.loc_info[k].replace("'", "''")})
+        q = "INSERT INTO {0} VALUES ('{1}', {2}, '{3}', '{4}')".format(self.tables['probe'], user, probe_id, st,
+                                                                       json.dumps(self.loc_info))
         self.conn.execute_query(q)
         return probe_id
 
     def load_to_db(self, stats):
         probe_id = self.get_probe_id()
         logger.debug("Got client %s" % probe_id)
-        p = Parser(self.config['tstatfile'], self.config['harfile'], probe_id)
+        p = Parser(self.dbconfig['tstatfile'], self.dbconfig['harfile'], probe_id)
         to_insert = p.parse()
         self.write_plugin_into_db(to_insert, stats)
 
     def write_plugin_into_db(self, session_dic, stats):
-        table_name = self.config['rawtable']
+        table_name = self.tables['raw']
         insert_query = 'INSERT OR IGNORE INTO ' + table_name + ' (%s) values (%s)'
         update_query = 'UPDATE ' + table_name + ' SET mem_percent = %d, cpu_percent = %d where rowid = %d'
         httpid_inserted = []  # FIXME keep track of duplicates
@@ -67,7 +84,7 @@ class DBClient():
         full_load_time = session_dic['full_load_time']
 
         entries = session_dic['entries']
-        for httpid, obj in entries.iteritems():
+        for httpid, obj in entries.items():
             if httpid in httpid_inserted:
                 continue
             uri = obj['uri']
@@ -118,14 +135,14 @@ class DBClient():
         self._generate_sid_on_table()
 
     def _generate_sid_on_table(self):
-        q = "select max(sid) from {0}".format(self.config['rawtable'])
+        q = "select max(sid) from {0}".format(self.tables['raw'])
         res = self.conn.execute_query(q)
         max_sid = 0
         if res[0] != (None,):
             max_sid = int(res[0][0])
 
         query = '''select distinct probe_id, session_start from {0} where sid is NULL
-        order by session_start'''.format(self.config['rawtable'])
+        order by session_start'''.format(self.tables['raw'])
         res = self.conn.execute_query(query)
         logger.debug('Found {0} sessions to insert'.format(len(res)))
         for tup in res:
@@ -133,7 +150,7 @@ class DBClient():
             session_start = tup[1]
             max_sid += 1
             query = '''update {0} set sid = {1} where
-            session_start = '{2}' and probe_id = {3}'''.format(self.config['rawtable'], max_sid, session_start, probe_id)
+            session_start = '{2}' and probe_id = {3}'''.format(self.tables['raw'], max_sid, session_start, probe_id)
             try:
                 self.conn.execute_query(query)
             except sqlite3.Error:
@@ -145,7 +162,7 @@ class DBClient():
         from {0} a, {1} b
         where a.sid = b.sid and not b.is_sent
         and b.sid not in (select distinct sid from {2});'''\
-            .format(self.config['aggregatedetails'], self.config['aggregatesummary'], self.config['activetable'])
+            .format(self.tables['aggr_det'], self.tables['aggr_sum'], self.tables['active'])
 
         res = self.conn.execute_query(q)
         for tup in res:
@@ -179,20 +196,17 @@ class DBClient():
             if 'trace' in dic.keys():
                 trace = dic['trace']
                 query = '''INSERT OR IGNORE into %s (ip_dest, sid, session_url, remote_ip, ping, trace) values
-                ('%s', %d, '%s', '%s', '%s','%s') ''' % (self.config['activetable'], ip_dest, int(sid), url,
+                ('%s', %d, '%s', '%s', '%s','%s') ''' % (self.tables['active'], ip_dest, int(sid), url,
                                                          ip, ping, trace)
             else:
                 query = '''INSERT OR IGNORE into %s (ip_dest, sid, session_url, remote_ip, ping) values
-                ('%s', %d, '%s', '%s', '%s') ''' % (self.config['activetable'], ip_dest, int(sid), url, ip, ping)
+                ('%s', %d, '%s', '%s', '%s') ''' % (self.tables['active'], ip_dest, int(sid), url, ip, ping)
 
             self.conn.execute_query(query)
         logger.info('inserted active measurements for sid %s: ' % sid)
 
     def get_table_names(self):
-        return {'rawtable': self.config['rawtable'], 'activetable': self.config['activetable'],
-                'summarytable': self.config['aggregatesummary'], 'detailstable': self.config['aggregatedetails'],
-                'probeidtable': self.config['probeidtable'],
-                'localdiagnosistable': self.config['localdiagnosistable']}
+        return self.tables
 
     def pre_process_raw_table(self):
         # TODO: page_dim as sum of netw_bytes in summary
@@ -201,7 +215,7 @@ class DBClient():
         q = '''select distinct sid, full_load_time from {0}
             where sid not in (select distinct sid from {1})
             group by sid, full_load_time
-            having count(sid) > 1'''.format(self.config['rawtable'], self.config['aggregatesummary'])
+            having count(sid) > 1'''.format(self.tables['raw'], self.tables['aggr_sum'])
         res = self.conn.execute_query(q)
         if len(res) == 0:
             logger.warning('pre_process: no sids found')
@@ -213,7 +227,7 @@ class DBClient():
         for sid in d.keys():
             q = '''select distinct remote_ip, session_url, session_start, cpu_percent, mem_percent from %s
             where sid = %d and session_url = uri group by remote_ip, session_url, session_start,
-            cpu_percent, mem_percent''' % (self.config['rawtable'], sid)
+            cpu_percent, mem_percent''' % (self.tables['raw'], sid)
 
             res = self.conn.execute_query(q)
 
@@ -221,10 +235,10 @@ class DBClient():
                 logger.warning("Unable to find a match session_url = uri in session {0}".format(sid))
                 q = '''select distinct remote_ip, session_url, session_start, cpu_percent, mem_percent from %s
                 where sid = %d group by remote_ip, session_url, session_start, cpu_percent, mem_percent''' \
-                    % (self.config['rawtable'], sid)
+                    % (self.tables['raw'], sid)
                 res = self.conn.execute_query(q)
                 logger.warning("Found {0} urls relaxing the constraint.".format(len(res)))
-                logger.warning("Session {0} will not be inserted in {1}".format(sid, self.config['aggregatesummary']))
+                logger.warning("Session {0} will not be inserted in {1}".format(sid, self.tables['aggr_sum']))
                 continue
 
             if len(res) > 1:
@@ -242,7 +256,7 @@ class DBClient():
 
             q = '''select distinct remote_ip, count(*) as cnt, sum(app_rtt) as s_app,
             sum(rcv_time) as s_rcv, sum(body_bytes) as s_body, sum(syn_time) as s_syn from %s where sid = %d
-            group by remote_ip;''' % (self.config['rawtable'], sid)
+            group by remote_ip;''' % (self.tables['raw'], sid)
             res = self.conn.execute_query(q)
 
             page_dim = 0
@@ -256,7 +270,7 @@ class DBClient():
 
             for el in dic[str(sid)]['browser']:
                 ip = el['ip']
-                q = '''select uri from %s where remote_ip = \'%s\'''' % (self.config['rawtable'], ip)
+                q = '''select uri from %s where remote_ip = \'%s\'''' % (self.tables['raw'], ip)
                 res = self.conn.execute_query(q)
                 el.update({'base_url': '/'.join(res[0][0].split('/')[:3])})
                 #if len(res) > 1:
@@ -264,15 +278,19 @@ class DBClient():
                 #else:
                 #    el.update({'base_url': '/'.join(res[0][0].split('/')[:3])})
 
-        return self.insert_to_aggregate(dic)
+        if self.insert_to_aggregate(dic):
+            return dic
+        else:
+            logger.error("Something bad happened.")
+            return None
 
     def insert_to_aggregate(self, pre_processed):
         logger.debug("received at insert_to_aggregate: {0} sessions".format(len(pre_processed)))
-        table_name_summary = self.config['aggregatesummary']
-        table_name_details = self.config['aggregatedetails']
+        table_name_summary = self.tables['aggr_sum']
+        table_name_details = self.tables['aggr_det']
         stub = 'INSERT INTO ' + table_name_summary + ' (%s) values (%s)'
         stub2 = 'INSERT INTO ' + table_name_details + ' (%s) values (%s)'
-        for sid, obj in pre_processed.iteritems():
+        for sid, obj in pre_processed.items():
             url = obj['session_url']
             start = obj['session_start']
             flt = obj['full_load_time']

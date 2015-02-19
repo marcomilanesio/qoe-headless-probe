@@ -18,7 +18,7 @@
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-import ConfigParser
+import configparser as ConfigParser
 
 
 class Configuration():
@@ -44,9 +44,5 @@ class Configuration():
     def get_jsonserver_configuration(self):
         return self.__extract_values_to_dictionary(self.config.items('server'))
 
-    def get_traceroute_script(self):
-        return self.__extract_values_to_dictionary(self.config.items('active'))['script']
-
-if __name__ == '__main__':
-    c = Configuration('probe.conf')
-    print c.get_firefox_configuration()['nruns']
+    def get_flume_configuration(self):
+        return self.__extract_values_to_dictionary(self.config.items('flume'))

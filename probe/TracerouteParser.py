@@ -51,7 +51,7 @@ class TracerouteParser():
                 tmp = step.strip().split("  ")
                 hop = int(tmp[0])
                 if len(tmp) > 2:
-                    print str(tmp)
+                    print(str(tmp))
                     addr = [k for k in tmp[1].split(" ") if k != "*"][0]  # remove possible \* in traceroute
                     rtts = [float(tmp[i].split(" ")[0]) for i in range(2, len(tmp)) if tmp[i] != '*']
                 else:
@@ -83,30 +83,4 @@ class TracerouteParser():
                 self.nodes[str(last_inserted)].append((alt, []))
                 continue
 
-    def get_results(self, print_=False):
-        ordered_list_of_steps = []
-        numerical_keys = sorted(map(int, self.nodes.keys()))
-        for k in numerical_keys:
-            ordered_list_of_steps.append(self.nodes[str(k)])
-            if print_:
-                print k, self.nodes[str(k)]
-            if self.nodes[str(k)][0][0] == self.target:
-                self.target_hop = k
-                break
-        
-        for k in [x for x in numerical_keys if x > self.target_hop]:
-            del self.nodes[str( k )]
-
-        #return self.nodes
-        return ordered_list_of_steps
-
-
-if __name__ == "__main__":
-    mtrfile = "./173.194.35.31.mtr"
-    t = TracerouteParser("173.194.35.31")    
-    t.parse_mtrfile(mtrfile)
-    res = t.get_results()
-    #print res
-    for i in range(len(res) - 1):
-        print i+1, len(res[i]), res[i]
 

@@ -19,11 +19,10 @@
 # this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 import json
-import fpformat
-import os
 import logging
 import datetime
 import operator
+import os
 
 logger = logging.getLogger("Parser")
 
@@ -50,11 +49,11 @@ class Parser():
                 for elem in httpids:
                     if elem in from_har:
                         app_rtt = float(line[15])+float(line[26])
-                        metrics = {unicode('local_ip'): line[0], unicode('local_port'): line[1],
-                                   unicode('syn_time'): fpformat.fix(line[13], 0),
-                                   unicode('app_rtt'): fpformat.fix(app_rtt, 0),
-                                   unicode('remote_ip'): line[30],
-                                   unicode('remote_port'): line[31],
+                        metrics = {'local_ip': line[0], 'local_port': line[1],
+                                   'syn_time': line[13],
+                                   'app_rtt': app_rtt,
+                                   'remote_ip': line[30],
+                                   'remote_port': line[31],
                                    }
                         self.har_dict['entries'][elem].update(metrics)
                         found.append(elem)
@@ -66,19 +65,19 @@ class Parser():
         for httpid in remaining:
             uri = self.har_dict['entries'][httpid]['uri']
             length = {}
-            for k, v in self.har_dict['entries'].iteritems():
+            for k, v in self.har_dict['entries'].items():
                 if k not in remaining:
                     length[k] = len(os.path.commonprefix([uri, v['uri']]))
-            candidate = max(length.iteritems(), key=operator.itemgetter(1))[0]
+            candidate = max(length.items(), key=operator.itemgetter(1))[0]
             matches[httpid] = candidate
 
-        for k, v in matches.iteritems():
+        for k, v in matches.items():
             ref = self.har_dict['entries'][v]
-            metrics = {unicode('local_ip'): ref['local_ip'], unicode('local_port'): ref['local_port'],
-                       unicode('syn_time'): ref['syn_time'],
-                       unicode('app_rtt'): ref['app_rtt'],
-                       unicode('remote_ip'): ref['remote_ip'],
-                       unicode('remote_port'): ref['remote_port'],
+            metrics = {'local_ip': ref['local_ip'], 'local_port': ref['local_port'],
+                       'syn_time': ref['syn_time'],
+                       'app_rtt': ref['app_rtt'],
+                       'remote_ip': ref['remote_ip'],
+                       'remote_port': ref['remote_port'],
                        }
             self.har_dict['entries'][k].update(metrics)
 
@@ -90,7 +89,7 @@ class Parser():
     @staticmethod
     def get_datetime(harstr):
         datetimestr = harstr.replace("T", " ")[:harstr.replace("T", " ").rfind("-")]
-        return unicode(datetime.datetime.strptime(datetimestr, '%Y-%m-%d %H:%M:%S.%f'))
+        return datetime.datetime.strptime(datetimestr, '%Y-%m-%d %H:%M:%S.%f')
 
     def parseHar(self):
         with open(self.harfile) as hf:
@@ -102,11 +101,11 @@ class Parser():
         session_start = Parser.get_datetime(page["startedDateTime"])
         full_load_time = page["pageTimings"]["onLoad"]
         logger.info("Found {0} objects on in the har file.".format(len(data['entries'])))
-        self.har_dict = {unicode('session_url'): session_url,
-                          unicode('probe_id'): self.client_id,
-                          unicode('session_start'): session_start,
-                          unicode('full_load_time'): full_load_time,
-                          unicode('entries'): None}
+        self.har_dict = {'session_url': session_url,
+                         'probe_id': self.client_id,
+                         'session_start': session_start,
+                         'full_load_time': full_load_time,
+                         'entries': None}
         har_metrics = {}
         for entry in data['entries']:
             request_ts = Parser.get_datetime(entry["startedDateTime"])
@@ -141,10 +140,10 @@ class Parser():
             #               unicode('rcv_time'): unicode(time), unicode('tab_id'): unicode('0'),
             #               unicode('httpid'): httpid,
             #               unicode('probe_id'): unicode(self.client_id)}
-            har_metrics[str(httpid)] = {unicode('uri'): url, unicode('request_ts'): request_ts,
-                                        unicode('content_type'): mime, unicode('body_bytes'): unicode(size),
-                                        unicode('first_bytes_rcv'): unicode(firstByte),
-                                        unicode('end_time'): unicode(end_ts), unicode('rcv_time'): unicode(time)}
+            har_metrics[str(httpid)] = {'uri': url, 'request_ts': request_ts,
+                                        'content_type': mime, 'body_bytes': size,
+                                        'first_bytes_rcv': firstByte,
+                                        'end_time': end_ts, 'rcv_time': time}
 
             self.har_dict['entries'] = har_metrics
 

@@ -95,15 +95,15 @@ function createHAR(address, title, startTime, elaspedTime, resources)
             startedDateTime: request.time.toISOLocalDateTimeString(),
             TimeToFirstByte: startReply.time.toISOLocalDateTimeString(),
             endtimeTS: endReply.time.toISOLocalDateTimeString(),
-	        time: endReply.time - request.time,
+	    time: endReply.time - request.time,
             request: {
                 method: request.method,
                 url: request.url,
                 httpVersion: "HTTP/1.1",
                 cookies: [],
                 headers: request.headers,
-		    //headers: [],
-		    queryString: [],
+		//headers: [],                
+		queryString: [],
                 headersSize: -1,
                 bodySize: -1
             },
@@ -128,7 +128,7 @@ function createHAR(address, title, startTime, elaspedTime, resources)
                 connect: -1,
                 send: 0,
                 wait: startReply.time - request.time,
-		    receive: endReply.time - startReply.time,
+		receive: endReply.time - startReply.time,
                 ssl: -1
             },
             pageref: address
@@ -208,7 +208,7 @@ if (system.args.length === 1) {
             
         } else {
             if (called) {
-		        console.log(page.address + ' recalled');
+		console.log(page.address + ' recalled');
                 return;
             }
     

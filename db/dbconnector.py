@@ -24,7 +24,7 @@ class DBConnector():
             self.conn.commit()
             return c.lastrowid
         else:
-            print "Query not supported. {0}".format(query)
+            print("Query not supported. {0}".format(query))
             self.conn.commit()
 
     def close_conn(self):

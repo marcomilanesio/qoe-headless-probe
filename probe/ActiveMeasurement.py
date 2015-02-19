@@ -62,7 +62,7 @@ class Ping(Measure):
 
         res = {}
         try:
-            res = self.parse(out)
+            res = self.parse(out.decode("utf-8"))
             logger.info('Ping received. {0}'.format(res))
         except Exception:
             logger.error('Unable to receive valid ping values')
@@ -74,6 +74,7 @@ class Ping(Measure):
         host = Ping._get_match_groups(ping_output, matcher)[0]
         matcher = re.compile(r'(\d+) packets transmitted, (\d+) received, (\d+)% packet loss, ')
         sent, received, loss = map(int, Ping._get_match_groups(ping_output, matcher))
+
         try:
             matcher = re.compile(r'(\d+.\d+)/(\d+.\d+)/(\d+.\d+)/(\d+.\d+)')
             rttmin, rttavg, rttmax, rttmdev = map(float, Ping._get_match_groups(ping_output, matcher))
@@ -197,10 +198,11 @@ class TracerouteHop(object):
         clean = [x for x in arr_data if x not in _endpoints and x != '*' and x != '!X']
 
         if len(clean) > 0:
-            self.rtt['min'] = min(map(float, clean))
-            self.rtt['max'] = max(map(float, clean))
-            self.rtt['avg'] = numpy.mean(map(float, clean))
-            self.rtt['std'] = numpy.std(map(float, clean))
+            cl = list(map(float, clean))
+            self.rtt['min'] = min(cl)
+            self.rtt['max'] = max(cl)
+            self.rtt['avg'] = numpy.mean(cl)
+            self.rtt['std'] = numpy.std(cl)
         else:
             self.rtt = -1
 
@@ -217,8 +219,9 @@ class Monitor(object):
 
     def run_active_measurement(self):
         tot = {}
+        result = {}
         probed_ip = {}
-        for sid, dic in self.inserted_sid.iteritems():
+        for sid, dic in self.inserted_sid.items():
             to_insert = []
             url = dic['url']
             server_ip = dic['complete']
@@ -241,7 +244,7 @@ class Monitor(object):
                 #tot[sid].append({'url': url, 'ip': server_ip, 'ping': ping_result, 'trace': trace_result})
                 probed_ip[server_ip] = {'ping': ping_result, 'trace': trace_result}
 
-                for k, v in trace.get_first_hops().iteritems():
+                for k, v in trace.get_first_hops().items():
                     if v != 'n.a.':
                         p = Ping(v)
                         p.run()
@@ -258,7 +261,7 @@ class Monitor(object):
                 #                 'trace': probed_ip[server_ip]['trace']})
 
             res, done = self.check_ipaddrs(url, ip_addrs, probed_ip)
-            for k, v in done.iteritems():
+            for k, v in done.items():
                 probed_ip[k] = v
             for d in res:
                 to_insert.append(d)
@@ -268,7 +271,9 @@ class Monitor(object):
 
             #self.db.insert_active_measurement(sid, server_ip, tot)
             self.db.insert_active_measurement(sid, server_ip, to_insert)
+            result[sid] = to_insert
         logger.info('ping and traceroute saved into db.')
+        return result
 
     def check_ipaddrs(self, url, ip_addrs, probed_ip):
         res = []
@@ -285,13 +290,13 @@ class Monitor(object):
         return res, done
 
     def do_measure(self, ip_dest):
-        for sid, dic in self.inserted_sid.iteritems():
+        for sid, dic in self.inserted_sid.items():
             logger.debug("Session {0} to url {1}: resolved {2}, objects from found {3}".format(sid, dic['url'],
                                                                                                ip_dest, dic['address']))
         tot = {}
         print (self.inserted_sid)
         # TODO: more logic here. e.g., if nr_obj is big
-        for sid, dic in self.inserted_sid.iteritems():
+        for sid, dic in self.inserted_sid.items():
             if sid not in tot.keys():
                 tot[sid] = []
             for ip in dic['address']:
@@ -309,15 +314,14 @@ class Monitor(object):
     # one single traceroute
     # ping to step 1,2,3, dest
     # to feed the diagnosis
-    def do_single_measure(self, ip_dest):
-        tot = {}
-        traceicmp = TracerouteIcmp(self.config.get_traceroute_script(), ip_dest)
-        if traceicmp.run_in_memory():
-            print traceicmp.get_result()
+    #def do_single_measure(self, ip_dest):
+    #    tot = {}
+    #    traceicmp = TracerouteIcmp(self.config.get_traceroute_script(), ip_dest)
+    #    if traceicmp.run_in_memory():
+    #        print traceicmp.get_result()
 
 
-if __name__ == '__main__':
-    from Configuration import Configuration
-    c = Configuration('probe.conf')
-    m = Monitor(c)
-    m.do_single_measure('213.92.16.191')
+if __name__ == "__main__":
+    p = Ping('8.8.8.8')
+    p.run()
+    print(p.get_result())

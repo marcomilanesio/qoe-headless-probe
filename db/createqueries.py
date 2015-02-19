@@ -1,4 +1,4 @@
-create_id_table = "CREATE TABLE IF NOT EXISTS {0} (user TEXT, probe_id INT4, first_start TEXT)"
+create_id_table = "CREATE TABLE IF NOT EXISTS {0} (user TEXT, probe_id INT4, first_start TEXT, location TEXT)"
 create_raw_table = '''CREATE TABLE IF NOT EXISTS {0} (
             uri text,
             request_ts datetime,
@@ -65,5 +65,13 @@ create_local_diagnosis = '''CREATE TABLE IF NOT EXISTS {0} (
             t1 real,
             d1 real,
             d2 real,
-            dh real
+            dh real,
+            count int
+        )'''
+create_local_diagnosis_result = '''CREATE TABLE IF NOT EXISTS {0} (
+            sid INT,
+            url TEXT,
+            when_browsed datetime,
+            diagnosis TEXT,
+            unique(sid, url)
         )'''

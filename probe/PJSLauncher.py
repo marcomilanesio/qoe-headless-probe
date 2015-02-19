@@ -108,7 +108,6 @@ class PJSLauncher():
         return self.osstats
 
     def browse_url(self, urlx):
-        #out = open(self.config['logfile'], 'a')
         if not re.match('http://', urlx):
             url = 'http://' + urlx.strip()
         else:
@@ -138,21 +137,3 @@ class PJSLauncher():
         self.osstats[url] = res
         return self.osstats
 
-    '''
-    def dump_data_on_error(self):
-        import datetime
-        import time
-        now = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-        dumpfile = './dumped.plugin.file.%s' % now
-        plugin_file = self.config.get_database_configuration()['pluginoutfile']
-        #os.rename(plugin_file, dumpfile)
-        logger.info('Dumped plugin out file to: %s' % dumpfile)
-        logger.info('Sleeping 5 seconds...')
-        time.sleep(5)
-        
-        return None
-    '''
-        
-if __name__ == '__main__':
-    f = PJSLauncher()
-    print f.browse_urls()
