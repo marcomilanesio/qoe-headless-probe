@@ -36,12 +36,12 @@ class Parser():
 
     def parseTstat(self, separator="\n"):
         log = open(self.tstatfile, 'r')
-        lines = log.readlines()
+        from_tstat_lines = log.readlines()
         log.close()
         from_har = self.har_dict['entries'].keys()
         found = []
         #json_metrics = ''
-        rows = [line[:-1].split(" ") for line in lines]
+        rows = [line[:-1].split(" ") for line in from_tstat_lines]
         for line in rows:
             if line[59] is not "":  # avoid HTTPS sessions
                 line[59] = line[59][:-1]
@@ -60,31 +60,33 @@ class Parser():
 
         # if elem is not found in tstat, then find the most similar uri and copy data from that
         remaining = [x for x in from_har if x not in found]
-        logger.warning("{0} elements from har file are not logged in tstat".format(len(remaining)))
-        matches = {}
-        for httpid in remaining:
-            uri = self.har_dict['entries'][httpid]['uri']
-            length = {}
-            for k, v in self.har_dict['entries'].items():
-                if k not in remaining:
-                    length[k] = len(os.path.commonprefix([uri, v['uri']]))
-            candidate = max(length.items(), key=operator.itemgetter(1))[0]
-            matches[httpid] = candidate
+        if remaining:
+            logger.warning("{0} elements from har file are not logged in tstat".format(len(remaining)))
+            matches = {}
+            for httpid in remaining:
+                uri = self.har_dict['entries'][httpid]['uri']
+                length = {}
+                for k, v in self.har_dict['entries'].items():
+                    if k not in remaining:
+                        length[k] = len(os.path.commonprefix([uri, v['uri']]))
 
-        for k, v in matches.items():
-            ref = self.har_dict['entries'][v]
-            metrics = {'local_ip': ref['local_ip'], 'local_port': ref['local_port'],
-                       'syn_time': ref['syn_time'],
-                       'app_rtt': ref['app_rtt'],
-                       'remote_ip': ref['remote_ip'],
-                       'remote_port': ref['remote_port'],
-                       }
-            self.har_dict['entries'][k].update(metrics)
+                candidate = max(length.items(), key=operator.itemgetter(1))[0]
+                matches[httpid] = candidate
 
-        if matches:
-            logger.info("{0} objects ingested from similar objects (most similar uri).".format(len(matches)))
-        else:
-            logger.info("No data ingested.")
+            for k, v in matches.items():
+                ref = self.har_dict['entries'][v]
+                metrics = {'local_ip': ref['local_ip'], 'local_port': ref['local_port'],
+                           'syn_time': ref['syn_time'],
+                           'app_rtt': ref['app_rtt'],
+                           'remote_ip': ref['remote_ip'],
+                           'remote_port': ref['remote_port'],
+                           }
+                self.har_dict['entries'][k].update(metrics)
+
+            if matches:
+                logger.info("{0} objects ingested from similar objects (most similar uri).".format(len(matches)))
+            else:
+                logger.info("No data ingested.")
 
     @staticmethod
     def get_datetime(harstr):
@@ -125,7 +127,10 @@ class Parser():
             response = entry['response']
             content = response['content']
             size = content['size']
-            mime = content['mimeType'].split(";")[0]  # eliminate charset utf-8 from text
+            try:
+                mime = content['mimeType'].split(";")[0]  # eliminate charset utf-8 from text
+            except AttributeError: #mimeType not present
+                mime = ''
 
             #timings = entry['timings']
             #wait = timings['wait']
