@@ -44,7 +44,12 @@ class LocalDiagnosisManager():
             return None
 
     def prepare_for_diagnosis(self, passive, active):
-        assert len(passive) == 1
+        try:
+            assert len(passive) == 1
+        except AssertionError as e:
+            logger.error("len(passive) = {0} ".format(len(passive)))
+            logger.error(e)
+            exit(1)
         sid = list(passive.keys())[0]
         locals = self.get_local_data()
         if not locals:
