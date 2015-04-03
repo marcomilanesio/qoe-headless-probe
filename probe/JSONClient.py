@@ -42,14 +42,14 @@ class JSONClient():
         self.probeid = self._get_client_id_from_db()
 
     def _get_client_id_from_db(self):
-        q = "select distinct probe_id from {0}".format(self.db.get_table_names()['probe'])
+        q = "select distinct probe_id from {0}".format(self.db.tables['probe'])
         r = self.db.execute(q)
         assert len(r) == 1
         return int(r[0][0])
 
     def prepare_data(self):
         probedata = {}
-        query = '''select user, probe_id, first_start, location from {0}'''.format(self.db.get_table_names()['probe'])
+        query = '''select user, probe_id, first_start, location from {0}'''.format(self.db.tables['probe'])
         res = self.db.execute(query)
         assert len(res) == 1
         user, probe_id, first_start, location_str = res[0]
@@ -59,7 +59,7 @@ class JSONClient():
 
         query = '''select sid, session_url, session_start, server_ip,
         full_load_time, page_dim, cpu_percent, mem_percent from {0} where not is_sent'''.\
-            format(self.db.get_table_names()['aggr_sum'])
+            format(self.db.tables['aggr_sum'])
         res = self.db.execute(query)
         if len(res) == 0:
             logger.warning("Nothing to send. All flags are valid.")
@@ -82,7 +82,7 @@ class JSONClient():
             r['local_diagnosis'] = {}
 
             query = '''select base_url, ip, netw_bytes, nr_obj, sum_syn, sum_http, sum_rcv_time
-            from {0} where sid = {1}'''.format(self.db.get_table_names()['aggr_det'], row[0])
+            from {0} where sid = {1}'''.format(self.db.tables['aggr_det'], row[0])
             det = self.db.execute(query)
 
             for det_row in det:
@@ -97,7 +97,7 @@ class JSONClient():
                 r['services'].append(d)
 
             query = '''select remote_ip, ping, trace
-            from {0} where sid = {1}'''.format(self.db.get_table_names()['active'], row[0])
+            from {0} where sid = {1}'''.format(self.db.tables['active'], row[0])
             active = self.db.execute(query)
 
             for active_row in active:
@@ -106,7 +106,7 @@ class JSONClient():
                 r['active_measurements'].update(a)      # dictionary!
 
             query = '''select diagnosis from {0} where sid = {1} and url = '{2}' '''\
-                .format(self.db.get_table_names()['diag_result'], r['sid'], r['session_url'])
+                .format(self.db.tables['diag_result'], r['sid'], r['session_url'])
 
             res = self.db.execute(query)
             r['local_diagnosis'] = json.loads(res[0][0])
@@ -144,7 +144,7 @@ class JSONClient():
         logger.info("Received %s" % str(result))
 
         for sid in result['sids']:
-            q = '''update %s set is_sent = 1 where sid = %d''' % (self.db.get_table_names()['aggr_sum'], int(sid))
+            q = '''update %s set is_sent = 1 where sid = %d''' % (self.db.tables['aggr_sum'], int(sid))
             self.db.execute(q)
         logger.debug("Set is_sent flag on summary table for sids {0}.".format(result['sids']))
 

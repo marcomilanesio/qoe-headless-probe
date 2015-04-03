@@ -23,10 +23,11 @@ import logging
 import datetime
 import operator
 import os
+from decorator import debugclass
 
 logger = logging.getLogger("Parser")
 
-
+@debugclass
 class Parser():
     def __init__(self, tstatfile, harfile, client_id):
         self.tstatfile = tstatfile

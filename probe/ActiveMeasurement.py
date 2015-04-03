@@ -23,6 +23,7 @@ import json
 import re
 import logging
 import numpy
+from decorator import debug, debugclass
 
 logger = logging.getLogger('Active')
 
@@ -45,6 +46,7 @@ class Ping(Measure):
         Measure.__init__(self, host)
         self.cmd = 'ping -c 5 %s ' % self.target
 
+    @debug
     def run(self):
         ping = subprocess.Popen(self.cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
         out, error = ping.communicate()
@@ -69,6 +71,7 @@ class Ping(Measure):
 
         self.result = json.dumps(res)
 
+    @debug
     def parse(self, ping_output):
         matcher = re.compile(r'PING ([a-zA-Z0-9.\-]+) \(')
         host = Ping._get_match_groups(ping_output, matcher)[0]
@@ -100,6 +103,7 @@ class Traceroute(Measure):
         self.cmd = 'traceroute -n -m %d %s ' % (maxttl, self.target)
         self.result = None
 
+    @debug
     def run(self):
         fname = self.target + '.traceroute'
         outfile = open(fname, 'w')
@@ -209,7 +213,7 @@ class TracerouteHop(object):
     def __str__(self):
         return '%d: %s, %.3f %s' % (self.hop_nr, self.ip_addr, self.rtt['avg'], str(self.endpoints))
 
-
+@debugclass
 class Monitor(object):
     def __init__(self, config, dbconn):
         self.config = config
