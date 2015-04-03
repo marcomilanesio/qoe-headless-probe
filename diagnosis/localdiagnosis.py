@@ -21,16 +21,17 @@
 import logging
 import json
 from .cusum import Cusum
+from decorator import debugclass
 
 logger = logging.getLogger('LocalDiagnosisManager')
 
-
+@debugclass
 class LocalDiagnosisManager():
     def __init__(self, db, url):
         self.url = url
         self.db = db
-        self.table_values = self.db.get_table_names()['diag_values']
-        self.table_result = self.db.get_table_names()['diag_result']
+        self.table_values = self.db.tables['diag_values']
+        self.table_result = self.db.tables['diag_result']
 
     def get_local_data(self):
         q = '''select flt, http, tcp, dim, t1, d1, d2, dh, count
@@ -203,7 +204,7 @@ class LocalDiagnosisManager():
 
     def store_diagnosis_result(self, sid, diagnosis):
         q = "select session_start, session_url from {0} where sid = {1}".\
-            format(self.db.get_table_names()['aggr_sum'], sid)
+            format(self.db.tables['aggr_sum'], sid)
         res = self.db.execute(q)
         when = res[0][0]
         url = res[0][1]

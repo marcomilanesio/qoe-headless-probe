@@ -8,11 +8,13 @@ import json
 from .dbconnector import DBConnector
 import db.createqueries as cq
 from probe.Parser import Parser
+from decorator import debugclass
 import sys
 
 logger = logging.getLogger('DBClient')
 
 
+@debugclass
 class DBClient():
 
     def __init__(self, configuration, loc_info, create=False):
@@ -205,8 +207,6 @@ class DBClient():
             self.conn.execute_query(query)
         logger.info('inserted active measurements for sid %s: ' % sid)
 
-    def get_table_names(self):
-        return self.tables
 
     def pre_process_raw_table(self):
         # TODO: page_dim as sum of netw_bytes in summary
@@ -222,7 +222,7 @@ class DBClient():
             return
 
         d = dict(res)
-        logger.debug("{0} session(s) to preprocess: sids {1} ".format(len(d.keys()), d.keys()))
+        logger.debug("{0} session(s) to preprocess: sids {1} ".format(len(d), d.keys()))
         dic = {}
         for sid in d.keys():
             q = '''select distinct remote_ip, session_url, session_start, cpu_percent, mem_percent from %s
