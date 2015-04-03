@@ -61,17 +61,28 @@ class Parser():
         # if elem is not found in tstat, then find the most similar uri and copy data from that
         remaining = [x for x in from_har if x not in found]
         if remaining:
-            logger.warning("{0} elements from har file are not logged in tstat".format(len(remaining)))
+            logger.warning("{0} elements from har file are not logged in tstat {1}".format(len(remaining), remaining))
             matches = {}
             for httpid in remaining:
+                logger.debug("from remaining: {0}".format(httpid))
                 uri = self.har_dict['entries'][httpid]['uri']
                 length = {}
                 for k, v in self.har_dict['entries'].items():
+                    logger.debug("cycling har_dict = {0} - {1}".format(k, v['uri']))
                     if k not in remaining:
+                        logger.debug("not found in remaining = {0}".format(k))
                         length[k] = len(os.path.commonprefix([uri, v['uri']]))
+                        logger.debug("common path with {0} ({1}) : {2}".format(httpid, length[k],
+                                                                               os.path.commonprefix([uri, v['uri']])))
+                    else:
+                        logger.debug("found in remaining = {0}.. proceed".format(k))
 
-                candidate = max(length.items(), key=operator.itemgetter(1))[0]
-                matches[httpid] = candidate
+                if length:
+                    logger.debug("length = {0}".format(length))
+                    candidate = max(length.items(), key=operator.itemgetter(1))[0]
+                    logger.debug("candidate = {0}".format(candidate))
+                    matches[httpid] = candidate
+                    logger.debug("matches = {0}".format(matches))
 
             for k, v in matches.items():
                 ref = self.har_dict['entries'][v]
@@ -87,6 +98,8 @@ class Parser():
                 logger.info("{0} objects ingested from similar objects (most similar uri).".format(len(matches)))
             else:
                 logger.info("No data ingested.")
+        else:
+            logger.debug("No items in remaining array")
 
     @staticmethod
     def get_datetime(harstr):
@@ -154,7 +167,10 @@ class Parser():
 
     def parse(self):
         self.parseHar()
-        self.parseTstat()
+        try:
+            self.parseTstat()
+        except Exception as e:
+            logger.error(e)
         return self.har_dict
 
 '''
