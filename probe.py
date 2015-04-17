@@ -10,11 +10,11 @@ import logging.config
 import urllib.request
 import json
 
+from optparse import OptionParser
 from probe.Configuration import Configuration
 from probe.PJSLauncher import PJSLauncher
 from probe.ActiveMeasurement import Monitor
 from probe.JSONClient import JSONClient
-#from probe.LocalDiagnosisManager import LocalDiagnosisManager
 
 from db.dbclient import DBClient
 from diagnosis.localdiagnosis import LocalDiagnosisManager
@@ -70,28 +70,60 @@ def get_location():
     response = urllib.request.urlopen(loc_request)
     return json.loads(response.read().decode('utf-8'))
 
+
+def start_flume_process(config):
+    ex = "{0}{1}".format(config.get_flume_configuration()['flumedir'], "/bin/flume-ng")
+    confdir = config.get_flume_configuration()['confdir']
+    conffile = config.get_flume_configuration()['conffile']
+    agentname = config.get_flume_configuration()['agentname']
+    #flumelogging = "-Dflume.root.logger=INFO,console"
+    cmd = "{0} agent -c {1} -f {2} -n {3}".format(ex, confdir, conffile, agentname) #, flumelogging)
+    proc = subprocess.Popen(cmd.split())
+    return proc
+
+
+def stop_flume_process(proc):
+    proc.kill()
+
+
+def check_fs(config):
+    pass
+
 if __name__ == '__main__':
-    if len(sys.argv) < 4:
-        exit("Usage: %s %s %s %s" % (sys.argv[0], 'nr_runs', 'conf_file', 'backup folder'))
-    nun_runs = int(sys.argv[1])
-    conf_file = sys.argv[2]
-    backupdir = sys.argv[3]
+    parser = OptionParser()
+    parser.add_option("-c", "--conf", dest="conf_file", help="specify a configuration file", metavar="FILE", default='./probe.conf')
+    parser.add_option("-n", "--runs", dest="num_runs", help="specify the number of runs", metavar="INT", default=1)
+    parser.add_option("-d", "--backup", dest="backup_dir", help="specify the directory for backups", metavar="DIR", default='./session_bkp')
+    (options, args) = parser.parse_args()
+    #print(options.num_runs)
+    if len(args) != 3:
+        print("Use -h for complete list of options")
+        print("Launching with: {0}".format(options))
+
     logger = logging.getLogger('probe')
-    config = Configuration(conf_file)        
+    config = Configuration(options.conf_file)
+    logger.debug("Launching the probe...")
+    check_fs(config)
 
     tstat_out_file = config.get_database_configuration()['tstatfile']
     harfile = config.get_database_configuration()['harfile']
     launcher = PJSLauncher(config)    
     
-    logger.debug('Backup dir set at: %s' % backupdir)
+    logger.debug('Backup dir set at: %s' % options.backup_dir)
     loc_info = get_location()
     if not loc_info:
         logger.warning("No info on location retrieved.")
     dbcli = DBClient(config, loc_info, create=True)
-    logger.debug('Starting nr_runs (%d)' % nun_runs)
+    flumeprocess = start_flume_process(config)
+    if flumeprocess:
+        logger.debug("flume started")
+    else:
+        logger.error("flume not started.. no data will be sent to repository")
+
+    logger.debug('Starting nr_runs (%d)' % options.nun_runs)
     pjs_config = config.get_phantomjs_configuration()
     t = TstatDaemonThread(config, 'start')
-    for i in range(nun_runs):
+    for i in range(options.nun_runs):
         for url_in_file in open(pjs_config['urlfile']):
             url = url_in_file.strip()
             try:
@@ -103,7 +135,7 @@ if __name__ == '__main__':
             if stats is None:
                 logger.warning('Problem in session %d [%s].. skipping' % (i, url))
                 # clean temp files
-                clean_files(backupdir, tstat_out_file, harfile, i, url, True)
+                clean_files(options.backup_dir, tstat_out_file, harfile, i, url, True)
                 continue
             if not os.path.exists(tstat_out_file):
                 logger.error('tstat outfile missing. Check your network configuration.')
@@ -112,7 +144,7 @@ if __name__ == '__main__':
             dbcli.load_to_db(stats)
             logger.info('Ended browsing run n.%d for %s' % (i, url))
             passive = dbcli.pre_process_raw_table()
-            new_fn = clean_files(backupdir, tstat_out_file, harfile, i, url)
+            new_fn = clean_files(options.backup_dir, tstat_out_file, harfile, i, url)
 
             logger.debug('Saved plugin file for run n.%d: %s' % (i, new_fn))
             monitor = Monitor(config, dbcli)
@@ -137,17 +169,19 @@ if __name__ == '__main__':
     jc.send_json_to_srv(measurements)
     logger.info('Probing complete. Packing Backups...')
 
+    stop_flume_process(flumeprocess)
+
     fname = os.path.basename(json_path_fname)
-    dest_file = os.path.join(backupdir, fname)
+    dest_file = os.path.join(options.backup_dir, fname)
    # os.rename(json_path_fname, dest_file)
     shutil.copyfile(json_path_fname, dest_file)	
 
-    for root, _, files in os.walk(backupdir):
+    for root, _, files in os.walk(options.backup_dir):
         if len(files) > 0:
-            tar = tarfile.open("%s.tar.gz" % backupdir, "w:gz")
-            tar.add(backupdir)
+            tar = tarfile.open("%s.tar.gz" % options.backup_dir, "w:gz")
+            tar.add(options.backup_dir)
             tar.close()
             logger.info('tar.gz backup file created.')
-    shutil.rmtree(backupdir)
+    shutil.rmtree(options.backup_dir)
     logger.info('Done. Exiting.')
     exit(0)
