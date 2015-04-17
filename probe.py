@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 import sys
 import os
 import shutil
@@ -9,6 +9,8 @@ import logging
 import logging.config
 import urllib.request
 import json
+import time
+import datetime
 
 from optparse import OptionParser
 from probe.Configuration import Configuration
@@ -86,8 +88,11 @@ def stop_flume_process(proc):
     proc.kill()
 
 
-def check_fs(config):
-    pass
+def check_fs(config, backup_dir):
+    if not os.path.isdir(config.get_flume_configuration()['outdir']):
+        os.makedirs(config.get_flume_configuration()['outdir'])
+    if not os.path.isdir(backup_dir):
+        os.makedirs(backup_dir)
 
 if __name__ == '__main__':
     parser = OptionParser()
@@ -100,30 +105,34 @@ if __name__ == '__main__':
         print("Use -h for complete list of options")
         print("Launching with: {0}".format(options))
 
+    ts = time.time()
+    st = datetime.datetime.fromtimestamp(ts).strftime('%Y%m%d-%H%M%S')
+    backup_dir = os.path.join(options.backup_dir, st)
+
     logger = logging.getLogger('probe')
     config = Configuration(options.conf_file)
     logger.debug("Launching the probe...")
-    check_fs(config)
+    check_fs(config, backup_dir)
 
     tstat_out_file = config.get_database_configuration()['tstatfile']
     harfile = config.get_database_configuration()['harfile']
     launcher = PJSLauncher(config)    
     
-    logger.debug('Backup dir set at: %s' % options.backup_dir)
+    logger.debug('Backup dir set at: %s' % backup_dir)
     loc_info = get_location()
     if not loc_info:
         logger.warning("No info on location retrieved.")
     dbcli = DBClient(config, loc_info, create=True)
     flumeprocess = start_flume_process(config)
     if flumeprocess:
-        logger.debug("flume started")
+        logger.debug("Flume agent started")
     else:
-        logger.error("flume not started.. no data will be sent to repository")
+        logger.error("Flume not started.. no data will be sent to repository")
 
-    logger.debug('Starting nr_runs (%d)' % options.nun_runs)
+    logger.debug('Starting nr_runs (%d)' % options.num_runs)
     pjs_config = config.get_phantomjs_configuration()
     t = TstatDaemonThread(config, 'start')
-    for i in range(options.nun_runs):
+    for i in range(options.num_runs):
         for url_in_file in open(pjs_config['urlfile']):
             url = url_in_file.strip()
             try:
@@ -135,7 +144,7 @@ if __name__ == '__main__':
             if stats is None:
                 logger.warning('Problem in session %d [%s].. skipping' % (i, url))
                 # clean temp files
-                clean_files(options.backup_dir, tstat_out_file, harfile, i, url, True)
+                clean_files(backup_dir, tstat_out_file, harfile, i, url, True)
                 continue
             if not os.path.exists(tstat_out_file):
                 logger.error('tstat outfile missing. Check your network configuration.')
@@ -144,7 +153,7 @@ if __name__ == '__main__':
             dbcli.load_to_db(stats)
             logger.info('Ended browsing run n.%d for %s' % (i, url))
             passive = dbcli.pre_process_raw_table()
-            new_fn = clean_files(options.backup_dir, tstat_out_file, harfile, i, url)
+            new_fn = clean_files(backup_dir, tstat_out_file, harfile, i, url)
 
             logger.debug('Saved plugin file for run n.%d: %s' % (i, new_fn))
             monitor = Monitor(config, dbcli)
@@ -172,16 +181,16 @@ if __name__ == '__main__':
     stop_flume_process(flumeprocess)
 
     fname = os.path.basename(json_path_fname)
-    dest_file = os.path.join(options.backup_dir, fname)
+    dest_file = os.path.join(backup_dir, fname)
    # os.rename(json_path_fname, dest_file)
     shutil.copyfile(json_path_fname, dest_file)	
 
-    for root, _, files in os.walk(options.backup_dir):
+    for root, _, files in os.walk(backup_dir):
         if len(files) > 0:
-            tar = tarfile.open("%s.tar.gz" % options.backup_dir, "w:gz")
-            tar.add(options.backup_dir)
+            tar = tarfile.open("%s.tar.gz" % backup_dir, "w:gz")
+            tar.add(backup_dir)
             tar.close()
             logger.info('tar.gz backup file created.')
-    shutil.rmtree(options.backup_dir)
+    shutil.rmtree(backup_dir)
     logger.info('Done. Exiting.')
     exit(0)
