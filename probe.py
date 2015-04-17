@@ -164,6 +164,7 @@ if __name__ == '__main__':
             l = LocalDiagnosisManager(dbcli, url)
             diagnosis = l.run_diagnosis(passive, active)
         else:
+            logger.info("run {0} done.".format(i))
             print("run {0} done.".format(i))
             continue
         # here we go if break in inner loop
