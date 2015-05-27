@@ -136,7 +136,6 @@ class JSONClient():
         csvnum = 0
         for session in measurements:
             expanded_session = csvutils.prepare_for_csv(session)
-            #print(expanded_session)
             max_len = 0
             mapping = {}
             result = []

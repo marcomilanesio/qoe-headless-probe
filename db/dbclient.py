@@ -59,7 +59,7 @@ class DBClient():
         probe_id = int(random.random()*ran)
         ts = time.time()
         st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
-        user = self.dbconfig['user']
+        user = self.dbconfig['username']
         for k in ['city', 'region']:
             self.loc_info.update({k: self.loc_info[k].replace("'", "''")})
         q = "INSERT INTO {0} VALUES ('{1}', {2}, '{3}', '{4}')".format(self.tables['probe'], user, probe_id, st,
@@ -330,3 +330,8 @@ class DBClient():
 
     def execute(self, query):
         return self.conn.execute_query(query)
+
+    def update_sent(self, arr):
+        self.execute('''update {0} set is_sent = 1 where sid in {1}'''.format(self.tables['aggr_sum'], tuple(arr)))
+        logger.debug("Updated is_sent for sessions {0}".format(tuple(arr)))
+

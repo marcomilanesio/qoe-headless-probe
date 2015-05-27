@@ -198,6 +198,8 @@ if __name__ == '__main__':
     s = TstatDaemonThread(config, 'stop')  # TODO check if tstat really quit
     jc = JSONClient(config, dbcli)
     measurements = jc.prepare_data()
+    to_update = [el['sid'] for el in measurements]
+
     if options.output == "csv":
         logger.debug("Saving csv file...")
         csv_path_fname_list = jc.save_csv_files(measurements)
@@ -208,6 +210,7 @@ if __name__ == '__main__':
     else:
         logger.error("Output format not valid. Not sending data.")
 
+    dbcli.update_sent(to_update)
     logger.info('Probing complete. Packing Backups...')
 
     if not options.noflume:
