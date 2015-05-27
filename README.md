@@ -6,7 +6,7 @@ This is part of the mPlane project.
   3. Edit probe.conf 
   
 To run the probe execute:
-  " ./main.sh probe.conf nr-runs "
+  " python3 probe.py -h "
 
 
   
