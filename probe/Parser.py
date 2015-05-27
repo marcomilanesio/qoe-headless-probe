@@ -65,25 +65,25 @@ class Parser():
             logger.warning("{0} elements from har file are not logged in tstat {1}".format(len(remaining), remaining))
             matches = {}
             for httpid in remaining:
-                logger.debug("from remaining: {0}".format(httpid))
+                #logger.debug("from remaining: {0}".format(httpid))
                 uri = self.har_dict['entries'][httpid]['uri']
                 length = {}
                 for k, v in self.har_dict['entries'].items():
-                    logger.debug("cycling har_dict = {0} - {1}".format(k, v['uri']))
+                    #logger.debug("cycling har_dict = {0} - {1}".format(k, v['uri']))
                     if k not in remaining:
                         logger.debug("not found in remaining = {0}".format(k))
                         length[k] = len(os.path.commonprefix([uri, v['uri']]))
-                        logger.debug("common path with {0} ({1}) : {2}".format(httpid, length[k],
-                                                                               os.path.commonprefix([uri, v['uri']])))
+                    #    logger.debug("common path with {0} ({1}) : {2}".format(httpid, length[k],
+                    #                                                           os.path.commonprefix([uri, v['uri']])))
                     else:
                         logger.debug("found in remaining = {0}.. proceed".format(k))
 
                 if length:
-                    logger.debug("length = {0}".format(length))
+                    #logger.debug("length = {0}".format(length))
                     candidate = max(length.items(), key=operator.itemgetter(1))[0]
-                    logger.debug("candidate = {0}".format(candidate))
+                    #logger.debug("candidate = {0}".format(candidate))
                     matches[httpid] = candidate
-                    logger.debug("matches = {0}".format(matches))
+                    #logger.debug("matches = {0}".format(matches))
 
             for k, v in matches.items():
                 ref = self.har_dict['entries'][v]
