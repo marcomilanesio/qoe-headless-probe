@@ -88,19 +88,21 @@ def stop_flume_process(proc):
     proc.kill()
 
 
-def check_fs(config, backup_dir):
-    if not os.path.isdir(config.get_flume_configuration()['outdir']):
-        os.makedirs(config.get_flume_configuration()['outdir'])
-    if not os.path.isdir(backup_dir):
-        os.makedirs(backup_dir)
-
 if __name__ == '__main__':
     parser = OptionParser()
-    parser.add_option("-c", "--conf", dest="conf_file", help="specify a configuration file", metavar="FILE", default='./probe.conf')
-    parser.add_option("-n", "--runs", dest="num_runs", help="specify the number of runs", metavar="INT", default=1)
-    parser.add_option("-d", "--backup", dest="backup_dir", help="specify the directory for backups", metavar="DIR", default='./session_bkp')
+    parser.add_option("-c", "--conf", dest="conf_file", type="string", help="specify a configuration file", metavar="FILE", default='./probe.conf')
+    parser.add_option("-n", "--runs", dest="num_runs", type="int", help="specify the number of runs", metavar="INT", default=1)
+    parser.add_option("-o", "--output", dest="output", type="string", help="csv / [json]", metavar="STRING", default="csv")
+    parser.add_option("-d", "--backup", dest="backup_dir", type="string", help="specify the directory for backups", metavar="DIR", default='./session_bkp')
+    parser.add_option("-u", "--url", dest="url", type="string", help="specify a url", metavar="URL", default=None)
+    parser.add_option("-f", "--no-flume", action="store_true", dest="noflume", help="do not use flume", default=False)
     (options, args) = parser.parse_args()
-    #print(options.num_runs)
+    if not os.path.isfile(options.conf_file):
+        print("Use -h for complete list of options: wrong configuration file")
+        exit(0)
+    if options.output not in ["csv", "json"]:
+        print("Use -h for complete list of options: wrong output format")
+        exit(0)
     if len(args) != 3:
         print("Use -h for complete list of options")
         print("Launching with: {0}".format(options))
@@ -112,7 +114,11 @@ if __name__ == '__main__':
     logger = logging.getLogger('probe')
     config = Configuration(options.conf_file)
     logger.debug("Launching the probe...")
-    check_fs(config, backup_dir)
+
+    if not os.path.isdir(config.get_flume_configuration()['outdir']):
+        os.makedirs(config.get_flume_configuration()['outdir'])
+    if not os.path.isdir(backup_dir):
+        os.makedirs(backup_dir)
 
     tstat_out_file = config.get_database_configuration()['tstatfile']
     harfile = config.get_database_configuration()['harfile']
@@ -123,17 +129,29 @@ if __name__ == '__main__':
     if not loc_info:
         logger.warning("No info on location retrieved.")
     dbcli = DBClient(config, loc_info, create=True)
-    flumeprocess = start_flume_process(config)
-    if flumeprocess:
-        logger.debug("Flume agent started")
+
+    flumeprocess = None
+    if not options.noflume:
+        flumeprocess = start_flume_process(config)
+        if flumeprocess:
+            logger.debug("Flume agent started")
+        else:
+            logger.error("Flume not started.. no data will be sent to repository")
     else:
-        logger.error("Flume not started.. no data will be sent to repository")
+        logger.debug("No Flume option set: sending to server")
 
     logger.debug('Starting nr_runs (%d)' % options.num_runs)
     pjs_config = config.get_phantomjs_configuration()
+
+    if not options.url:
+        url_list = open(pjs_config['urlfile'], 'r')
+    else:
+        url_list = [options.url]
+
     t = TstatDaemonThread(config, 'start')
+    #logger.debug("Running {0} runs for {1}".format(options.num_runs, [url.strip() for url in url_list]))
     for i in range(options.num_runs):
-        for url_in_file in open(pjs_config['urlfile']):
+        for url_in_file in url_list:
             url = url_in_file.strip()
             try:
                 stats = launcher.browse_url(url)
@@ -141,7 +159,7 @@ if __name__ == '__main__':
                 logger.error("Problems in browser thread. Aborting session...")
                 browser_error = True
                 break
-            if stats is None:
+            if not stats:
                 logger.warning('Problem in session %d [%s].. skipping' % (i, url))
                 # clean temp files
                 clean_files(backup_dir, tstat_out_file, harfile, i, url, True)
@@ -172,19 +190,39 @@ if __name__ == '__main__':
         s = TstatDaemonThread(config, 'stop')  # TODO check if tstat really quit
         exit(1)
 
+    try:
+        url_list.close()
+    except AttributeError:
+        pass
+
     s = TstatDaemonThread(config, 'stop')  # TODO check if tstat really quit
     jc = JSONClient(config, dbcli)
     measurements = jc.prepare_data()
-    json_path_fname = jc.save_json_file(measurements)
-    jc.send_json_to_srv(measurements)
+    if options.output == "csv":
+        logger.debug("Saving csv file...")
+        csv_path_fname_list = jc.save_csv_files(measurements)
+    elif options.output == "json":
+        logger.debug("Saving json file...")
+        json_path_fname = jc.save_json_file(measurements)
+        #jc.send_json_to_srv(measurements)
+    else:
+        logger.error("Output format not valid. Not sending data.")
+
     logger.info('Probing complete. Packing Backups...')
 
-    stop_flume_process(flumeprocess)
+    if not options.noflume:
+        stop_flume_process(flumeprocess)
+    else:
+        jc.send_csv()
 
-    fname = os.path.basename(json_path_fname)
-    dest_file = os.path.join(backup_dir, fname)
-   # os.rename(json_path_fname, dest_file)
-    shutil.copyfile(json_path_fname, dest_file)	
+    try:
+        if options.output == "csv":
+            for csv_path_fname in csv_path_fname_list:
+                shutil.copyfile(csv_path_fname, os.path.join(backup_dir, os.path.basename(csv_path_fname)))
+        else:
+            shutil.copyfile(json_path_fname, os.path.join(backup_dir, os.path.basename(json_path_fname)))
+    except FileNotFoundError:
+        logger.warning("Oops.. too fast!")
 
     for root, _, files in os.walk(backup_dir):
         if len(files) > 0:

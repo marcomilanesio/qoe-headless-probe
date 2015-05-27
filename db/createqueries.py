@@ -1,4 +1,4 @@
-create_id_table = "CREATE TABLE IF NOT EXISTS {0} (user TEXT, probe_id INT4, first_start TEXT, location TEXT)"
+create_id_table = "CREATE TABLE IF NOT EXISTS {0} (username TEXT, probe_id INT4, first_start TEXT, location TEXT)"
 create_raw_table = '''CREATE TABLE IF NOT EXISTS {0} (
             uri text,
             request_ts datetime,

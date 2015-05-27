@@ -61,7 +61,7 @@ class LocalDiagnosisManager():
             cusumT3T2 = Cusum('cusumT3T2', 0, 0)
             cusumTHTTPTTCP = Cusum('cusumTHTTPTTCP', 0, 0)
             time_th = passive[sid]['full_load_time'] + 1000
-            dim_th = passive[sid]['page_dim'] + 1000 * 5
+            dim_th = passive[sid]['page_dim'] + 1500 * 5
             http_th = sum([x['sum_http'] for x in passive[sid]['browser']]) + 50
             tcp_th = sum([x['sum_syn'] for x in passive[sid]['browser']]) + 50
             self.insert_first_locals(time_th, dim_th, http_th, tcp_th)

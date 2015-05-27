@@ -18,12 +18,13 @@
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-import configparser as ConfigParser
+import configparser
 
 
 class Configuration():
     def __init__(self, conf_file):
-        self.config = ConfigParser.RawConfigParser()
+        self.config = configparser.RawConfigParser()
+        self.config._interpolation = configparser.ExtendedInterpolation()
         self.config.read(conf_file)
 
     def __extract_values_to_dictionary(self, list_of_params):
@@ -46,3 +47,4 @@ class Configuration():
 
     def get_flume_configuration(self):
         return self.__extract_values_to_dictionary(self.config.items('flume'))
+
