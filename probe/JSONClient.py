@@ -18,26 +18,23 @@
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-import socket
 import json
 import logging
 import collections
+import csv
+import os
 
 logger = logging.getLogger('JSONClient')
 
 
 class JSONClient():
     def __init__(self, config, dbcli):
-        #self.activetable = config.get_database_configuration()['activetable']
-        #self.rawtable = config.get_database_configuration()['rawtable']
-        #self.summarytable = config.get_database_configuration()['aggregatesummary']
-        #self.detailtable = config.get_database_configuration()['aggregatedetails']
-        #self.probeidtable = config.get_database_configuration()['probeidtable']
-        #self.localdiagnosisresulttable = config.get_database_configuration()['localdiagnosisresult']
         self.srv_ip = config.get_jsonserver_configuration()['ip']
         self.srv_port = int(config.get_jsonserver_configuration()['port'])
         self.srv_mode = int(config.get_jsonserver_configuration()['mode'])
-        self.json_file = config.get_flume_configuration()['outfile']
+        self.flumedir = config.get_flume_configuration()['outdir']
+        self.json_file = config.get_flume_configuration()['outfile']  # TODO remove (os.path.join(flumedir, fname)
+        #self.csv_file = config.get_flume_configuration()['outfilecsv']  # TODO remove
         self.db = dbcli
         self.probeid = self._get_client_id_from_db()
 
@@ -49,13 +46,17 @@ class JSONClient():
 
     def prepare_data(self):
         probedata = {}
-        query = '''select user, probe_id, first_start, location from {0}'''.format(self.db.tables['probe'])
+        query = '''select username, probe_id, first_start, location from {0}'''.format(self.db.tables['probe'])
         res = self.db.execute(query)
         assert len(res) == 1
         user, probe_id, first_start, location_str = res[0]
+
+        location_dic = json.loads(location_str)
+        location_dic["loc"] = location_dic["loc"].replace(",", ";")
+
         assert self.probeid == probe_id
-        probedata.update({'user': user, 'probe_id': probe_id,
-                          'first_start': first_start, 'location': json.loads(location_str)})
+        probedata.update({'username': user, 'probe_id': probe_id,
+                          'first_start': first_start, 'location': location_dic})
 
         query = '''select sid, session_url, session_start, server_ip,
         full_load_time, page_dim, cpu_percent, mem_percent from {0} where not is_sent'''.\
@@ -121,31 +122,118 @@ class JSONClient():
         # one for each session: ['passive', 'active', 'ts', 'clientid', 'sid']
         logger.info('Saving json file...')
         with open(self.json_file, 'w') as out:
-            for m in measurements:
-                json.dump(m, out)
-            #out.write(measurements)
-            #out.write(json.dumps([m for m in measurements]))
+            out.write(json.dumps([m for m in measurements]))
+
         return self.json_file
 
-    def send_json_to_srv(self, measurements):
-        logger.info('Contacting server...')
-        try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.connect((self.srv_ip, self.srv_port))
-        except socket.error as e:
-            logger.error('Socket error({0}): {1}'.format(e.errno, e.strerror))
-            return False
+    def save_csv_files(self, measurements):
+        """
+        :param measurements: a list of OrderedDict, one for each session
+        :return:
+        """
+        import csvutils
+        csvfiles = []
+        csvnum = 0
+        for session in measurements:
+            expanded_session = csvutils.prepare_for_csv(session)
+            #print(expanded_session)
+            max_len = 0
+            mapping = {}
+            result = []
+            for k, v in sorted(list(expanded_session.items())):
+                if v is []:
+                    continue
+                if (isinstance(v, list) or isinstance(v, dict) or isinstance(v, collections.OrderedDict)) and \
+                                len(v) > max_len:
+                    max_len = len(v)
+                if isinstance(v, list):
+                    try:
+                        tmp = collections.OrderedDict(v[0])
+                        mapping[k] = sorted([k1 for k1 in tmp])
+                    except (TypeError, IndexError):
+                        continue
+                elif isinstance(v, dict) or isinstance(v, collections.OrderedDict):
+                    mapping[k] = sorted([k1 for k1 in v])
+                else:
+                    continue
 
-        data = json.dumps([m for m in measurements])
-        logger.info("Sending %d bytes" % len(data))
-        s.sendall(data + '\n')
-        result = json.loads(s.recv(1024))
-        s.close()
-        logger.info("Received %s" % str(result))
+            for i in range(max_len):
+                tmp = collections.OrderedDict()
+                for k, v in sorted(list(expanded_session.items())):
+                    if not isinstance(v, list):
+                        tmp.update({k: v})
+                    else:
+                        if k in mapping and i < len(v):
+                            if isinstance(v[i], list):
+                                for tup in v[i]:
+                                    tmp.update({tup[0]: tup[1]})
+                        elif k in mapping and i >= len(v):
+                            for mk in mapping[k]:
+                                tmp.update({mk: ''})
+                        else:
+                            try:
+                                tmp.update({k: v[i]})
+                            except IndexError:
+                                tmp.update({k: ''})
+                result.append(tmp)
 
-        for sid in result['sids']:
-            q = '''update %s set is_sent = 1 where sid = %d''' % (self.db.tables['aggr_sum'], int(sid))
-            self.db.execute(q)
-        logger.debug("Set is_sent flag on summary table for sids {0}.".format(result['sids']))
+            fname = os.path.join(self.flumedir, "{0}.csv".format(csvnum))
+            with open(fname, "w", newline='') as csvfile:
+                writer = csv.DictWriter(csvfile, result[0].keys())
+                #writer.writeheader()
+                #writer.writerows(result)
+                for el in result:
+                    try:
+                        writer.writerow(el)
+                    except ValueError:
+                        logger.error("not written: {0}".format(el))
+                csvfiles.append(fname)
 
-        return True
+            csvnum += 1
+
+        return csvfiles
+
+    def send_csv(self):
+        import socket
+        HOST = self.srv_ip
+        PORT = self.srv_port
+        for root, dirs, files in os.walk(self.flumedir):
+            for file in files:
+                with open(os.path.join(root, file), 'r') as f:
+                    data = ''.join(f.readlines())
+
+                    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+                    try:
+                        sock.connect((HOST, PORT))
+                        tosend = json.dumps(data)
+                        sock.sendall(bytes(tosend + "\n", "utf-8"))
+                        received = str(sock.recv(1024), "utf-8")
+                    finally:
+                        sock.close()
+
+                    logger.debug("Sent:     {}".format(len(tosend)))
+                    logger.debug("Received: {}".format(received))
+
+    # def send_json_to_srv(self, measurements):
+    #     logger.info('Contacting server...')
+    #     try:
+    #         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    #         s.connect((self.srv_ip, self.srv_port))
+    #     except socket.error as e:
+    #         logger.error('Socket error({0}): {1}'.format(e.errno, e.strerror))
+    #         return False
+    #
+    #     data = json.dumps([m for m in measurements])
+    #     logger.info("Sending %d bytes" % len(data))
+    #     s.sendall(data + '\n')
+    #     result = json.loads(s.recv(1024))
+    #     s.close()
+    #     logger.info("Received %s" % str(result))
+    #
+    #     for sid in result['sids']:
+    #         q = '''update %s set is_sent = 1 where sid = %d''' % (self.db.tables['aggr_sum'], int(sid))
+    #         self.db.execute(q)
+    #     logger.debug("Set is_sent flag on summary table for sids {0}.".format(result['sids']))
+    #
+    #     return True
