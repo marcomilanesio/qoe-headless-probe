@@ -1,16 +1,56 @@
-import json
+#!/usr/bin/python3
+import os
+import logging
 import socket
+import json
+import urllib.request
+
+
+logger = logging.getLogger(__name__)
+
+
+def clean_tmp_files(backupdir, outfilelist, sessionurl, error=False):
+    if error:
+        for fname in outfilelist:
+            try:
+                os.remove(fname)
+                logger.info("Removed {}".format(fname))
+            except FileNotFoundError:
+                logger.error("File not found: {}".format(fname))
+    else:
+        for fname in outfilelist:
+            fn = os.path.join(backupdir, fname.split('/')[-1] + "_{}".format(sessionurl))
+            os.rename(fname, fn)
+            logger.info("moved {0} to {1}".format(fname, fn))
 
 
 def valid_ip(address):
+    """
+
+    :param address: ip address to check
+    :return: True if valid IP
+    """
     try:
         socket.inet_aton(address)
         return True
-    except:
+    except socket.error:
         return False
 
 
+def get_location():
+        loc_request = urllib.request.Request('http://ipinfo.io')
+        loc_request.add_header('User-Agent', 'curl/7.30.0')
+        response = urllib.request.urlopen(loc_request)
+        return json.loads(response.read().decode('utf-8'))
+
+
 def add_prefix(c, prefix):
+    """
+
+    :param c: dict
+    :param prefix: string
+    :return: updated dictionary with prefix-key
+    """
     result = {}
     if isinstance(c, dict):
         for key, value in c.items():

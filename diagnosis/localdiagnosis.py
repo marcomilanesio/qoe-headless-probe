@@ -21,11 +21,10 @@
 import logging
 import json
 from .cusum import Cusum
-from decorator import debugclass
 
 logger = logging.getLogger('LocalDiagnosisManager')
 
-@debugclass
+
 class LocalDiagnosisManager():
     def __init__(self, db, url):
         self.url = url

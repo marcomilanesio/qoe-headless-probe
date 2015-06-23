@@ -7,19 +7,21 @@ import json
 
 from .dbconnector import DBConnector
 import db.createqueries as cq
-from probe.Parser import Parser
-from decorator import debugclass
+from probe.parser import Parser
 import sys
 
 logger = logging.getLogger('DBClient')
 
-
-@debugclass
 class DBClient():
 
     def __init__(self, configuration, loc_info, create=False):
         self.dbconfig = configuration.get_database_configuration()
-        self.conn = DBConnector(self.dbconfig['dbfile'])
+        try:
+            self.conn = DBConnector(self.dbconfig['dbfile'])
+        except sqlite3.OperationalError:
+            print("Unable to open the database file. Quitting")
+            print(self.dbconfig['dbfile'])
+            exit(1)
         self.loc_info = loc_info
         self.tables = {'raw': self.dbconfig['table_raw'],
                        'active': self.dbconfig['table_active'],
@@ -332,6 +334,10 @@ class DBClient():
         return self.conn.execute_query(query)
 
     def update_sent(self, arr):
-        self.execute('''update {0} set is_sent = 1 where sid in {1}'''.format(self.tables['aggr_sum'], tuple(arr)))
+        if len(arr) > 1:
+            q = '''update {0} set is_sent = 1 where sid in {1}'''.format(self.tables['aggr_sum'], tuple(arr))
+        else:
+            q = '''update {0} set is_sent = 1 where sid = {1}'''.format(self.tables['aggr_sum'], arr[0])
+        self.execute(q)
         logger.debug("Updated is_sent for sessions {0}".format(tuple(arr)))
 

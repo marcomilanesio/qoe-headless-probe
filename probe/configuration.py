@@ -48,3 +48,5 @@ class Configuration():
     def get_flume_configuration(self):
         return self.__extract_values_to_dictionary(self.config.items('flume'))
 
+    def get_base_configuration(self):
+        return self.__extract_values_to_dictionary(self.config.items('base'))

@@ -23,11 +23,9 @@ import logging
 import datetime
 import operator
 import os
-from decorator import debugclass
 
 logger = logging.getLogger("Parser")
 
-@debugclass
 class Parser():
     def __init__(self, tstatfile, harfile, client_id):
         self.tstatfile = tstatfile
@@ -71,12 +69,12 @@ class Parser():
                 for k, v in self.har_dict['entries'].items():
                     #logger.debug("cycling har_dict = {0} - {1}".format(k, v['uri']))
                     if k not in remaining:
-                        logger.debug("not found in remaining = {0}".format(k))
+                        #logger.debug("not found in remaining = {0}".format(k))
                         length[k] = len(os.path.commonprefix([uri, v['uri']]))
                     #    logger.debug("common path with {0} ({1}) : {2}".format(httpid, length[k],
                     #                                                           os.path.commonprefix([uri, v['uri']])))
-                    else:
-                        logger.debug("found in remaining = {0}.. proceed".format(k))
+                    #else:
+                    #    logger.debug("found in remaining = {0}.. proceed".format(k))
 
                 if length:
                     #logger.debug("length = {0}".format(length))
@@ -98,7 +96,8 @@ class Parser():
             if matches:
                 logger.info("{0} objects ingested from similar objects (most similar uri).".format(len(matches)))
             else:
-                logger.info("No data ingested.")
+                pass
+            #    logger.info("No data ingested.")
         else:
             logger.debug("No items in remaining array")
 
@@ -146,10 +145,6 @@ class Parser():
             except AttributeError: #mimeType not present
                 mime = ''
 
-            #timings = entry['timings']
-            #wait = timings['wait']
-            #receive = timings['receive']
-            #time = wait + receive
             time = entry['time']
 
             #har_metrics = {unicode('session_url'): session_url, unicode('full_load_time'): unicode(full_load_time),
@@ -174,29 +169,3 @@ class Parser():
             logger.error(e)
         return self.har_dict
 
-'''
-{unicode('session_url'): session_url, unicode('full_load_time'): unicode(onLoad),
-unicode('host'): request_host, unicode('uri'): request_url,
-unicode('request_ts'): request_ts, unicode('content_type'): cnt_type,
-unicode('content_len'): unicode('0'), unicode('session_start'): session_start,
-unicode('cache'): unicode('0'), unicode('response_code'): unicode(status),
-unicode('get_bytes'): unicode('-1'), unicode('header_bytes'): unicode('-1'),
-unicode('body_bytes'): unicode(responde_body_size),
-unicode('cache_bytes'): unicode('0'),
-unicode('dns_start'): unicode('1970-01-01 01:00:00'),
-unicode('dns_time'): unicode(dns),
-unicode('syn_start'): unicode('1970-01-01 01:00:00'),
-unicode('is_sent'): unicode('0'),
-unicode('get_sent_ts'): unicode('1970-01-01 01:00:00'),
-unicode('first_bytes_rcv'): unicode(firstByte),
-unicode('end_time'): unicode(endTS),
-unicode('rcv_time'): unicode(receive), unicode('tab_id'): unicode('0'),
-unicode('ping_gateway'): unicode('0'), unicode('ping_google'): unicode('0'),
-unicode('annoy'): unicode('0')}
-'''
-if __name__ == '__main__':
-    import os
-    harfile = '/tmp/phantomjs.har'
-    tstatfile = '/tmp/tstat.out/log_own_complete'
-    p = Parser(tstatfile, harfile, 1608989979)
-    p.parse()

@@ -24,10 +24,8 @@ import re
 import logging
 import numpy
 import os
-from decorator import debug, debugclass
 
 logger = logging.getLogger('Active')
-
 
 class Measure(object):
     def __init__(self, host):
@@ -47,7 +45,6 @@ class Ping(Measure):
         Measure.__init__(self, host)
         self.cmd = 'ping -c 5 %s ' % self.target
 
-    @debug
     def run(self):
         ping = subprocess.Popen(self.cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
         out, error = ping.communicate()
@@ -60,7 +57,6 @@ class Ping(Measure):
 
         self.result = json.dumps(res)
 
-    @debug
     def parse(self, ping_output):
         matcher = re.compile(r'PING ([a-zA-Z0-9.\-]+) \(')
         host = Ping._get_match_groups(ping_output, matcher)[0]
@@ -76,7 +72,6 @@ class Ping(Measure):
         return {'host': host, 'sent': sent, 'received': received, 'loss': loss, 'min': rttmin,
                 'avg': rttavg, 'max': rttmax, 'std': rttmdev}
 
-    @staticmethod
     def _get_match_groups(ping_output, regex):
         match = regex.search(ping_output)
         if not match:
@@ -92,7 +87,6 @@ class Traceroute(Measure):
         self.cmd = 'traceroute -n -m %d %s ' % (maxttl, self.target)
         self.result = None
 
-    @debug
     def run(self):
         fname = self.target + '.traceroute'
         outfile = open(fname, 'w')
@@ -105,7 +99,6 @@ class Traceroute(Measure):
         outfile.close()
         self.parse_file(fname)
 
-    @debug
     def parse_file(self, outfile):
         f = open(outfile, 'r')
         arr = f.readlines()
@@ -178,8 +171,8 @@ class TracerouteHop(object):
     def __str__(self):
         return '%d: %s, %.3f %s' % (self.hop_nr, self.ip_addr, self.rtt['avg'], str(self.endpoints))
 
-@debugclass
-class Monitor(object):
+
+class ActiveMonitor(object):
     def __init__(self, config, dbconn):
         self.config = config
         self.db = dbconn
@@ -253,11 +246,3 @@ class Monitor(object):
             else:
                 res.append({'url': url, 'ip': ip, 'ping': probed_ip[ip]['ping']})
         return res, done
-
-if __name__ == "__main__":
-    p = Traceroute('8.8.8.8')
-    p.run()
-    print(p.get_result())
-    p = Ping('8.8.8.8')
-    p.run()
-    print(p.get_result())

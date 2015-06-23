@@ -21,13 +21,16 @@
 import subprocess
 import psutil
 import time
-from probe.Configuration import Configuration
 import logging
 import threading
 import os
 import re
 
 logger = logging.getLogger('PJSLauncher')
+
+
+class PhantomjsNotFoundError(FileNotFoundError):
+    pass
 
 
 class BrowserThread(threading.Thread):
@@ -57,9 +60,6 @@ class BrowserThread(threading.Thread):
             #if self.process.poll() == 0:
             self.mem = float(sum(memtable) / len(memtable))
             self.cpu = float(sum(cputable) / len(cputable))
-            #print 'mem = %.2f, cpu = %.2f' % (self.mem, self.cpu)
-            #else:
-                #logger.error('Browsing thread mem and cpu not set')            
             logger.debug('Browsing Thread finished')
             o.close()
             e.close()
@@ -75,15 +75,6 @@ class BrowserThread(threading.Thread):
             logger.warning("retcode: {0}".format(self.process.returncode))
             thread.join()
             timeout_flag = True
-            #try:
-            #    self.process.terminate()
-            #    logger.warning('Terminated.')
-            #except AttributeError as e:
-            #    logger.error('Error in browser thread {0} {1}'.format(e.errno, e.strerror))
-            #    return self.flag, self.mem, self.cpu, True
-            #finally:
-            #    self.flag = True
-            #    thread.join()
         
         return self.flag, self.mem, self.cpu, timeout_flag
                 
@@ -92,20 +83,20 @@ class PJSLauncher():
     def __init__(self, config):
         self.config = config
         self.pjs_config = self.config.get_phantomjs_configuration()
+        if not os.path.exists(os.path.join(self.pjs_config['dir'], "bin/phantomjs")):
+            raise PhantomjsNotFoundError('PhantomJS browser not found')
         self.osstats = {}
         logger.debug('Loaded configuration')
 
-    def browse_urls(self):	
-        for url in open(self.pjs_config['urlfile']):	    
-            if not re.match('http://', url):
-                use = 'http://' + url.strip()
-            else:
-                use = url.strip()
-            if use[-1] != '\/':
-                use += '/'
-            self.osstats[use] = self.browse_url(use)
-
-        return self.osstats
+    #@staticmethod
+    #def check_for_redirection(urlx):
+    #    loc = urllib.request.Request(urlx)
+    #    loc.add_header('User-Agent', 'curl/7.30.0')
+    #    res = urllib.request.urlopen(loc)
+    #    result = res.geturl()
+    #    if result is not urlx:
+    #        logger.debug("{0} was redirected to {1}".format(urlx, result))
+    #    return result
 
     def browse_url(self, urlx):
         if not re.match('http://', urlx):
@@ -114,6 +105,8 @@ class PJSLauncher():
             url = urlx.strip()
         if url[-1] != '\/':
             url += '/'
+
+        #url = self.check_for_redirection(url)
         logger.info('Browsing %s', url)
         res = {'mem': 0.0, 'cpu': 0.0}
         cmdstr = "%s/bin/phantomjs %s %s" % (self.pjs_config['dir'], self.pjs_config['script'], url)
@@ -123,8 +116,6 @@ class PJSLauncher():
         if timeout_flag:
             logger.error('Error in browsing thread reported.')
             return None
-            #logger.debug('browserthread {0} {1} {2}'.format(flag, mem, cpu))
-        #else:
 
         if not flag:
             res['mem'] = mem
@@ -133,7 +124,6 @@ class PJSLauncher():
         else:
             logger.warning('Problems in browsing thread. Need to restart browser...')
             time.sleep(5)
-        #out.close()
         self.osstats[url] = res
         return self.osstats
 

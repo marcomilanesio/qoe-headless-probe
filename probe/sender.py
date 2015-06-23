@@ -31,9 +31,8 @@ class JSONClient():
     def __init__(self, config, dbcli):
         self.srv_ip = config.get_jsonserver_configuration()['ip']
         self.srv_port = int(config.get_jsonserver_configuration()['port'])
-        self.srv_mode = int(config.get_jsonserver_configuration()['mode'])
         self.flumedir = config.get_flume_configuration()['outdir']
-        self.json_file = config.get_flume_configuration()['outfile']  # TODO remove (os.path.join(flumedir, fname)
+        #self.json_file = config.get_flume_configuration()['outfile']  # TODO remove (os.path.join(flumedir, fname)
         #self.csv_file = config.get_flume_configuration()['outfilecsv']  # TODO remove
         self.db = dbcli
         self.probeid = self._get_client_id_from_db()
@@ -131,11 +130,11 @@ class JSONClient():
         :param measurements: a list of OrderedDict, one for each session
         :return:
         """
-        import csvutils
+        from utils import utils
         csvfiles = []
         csvnum = 0
         for session in measurements:
-            expanded_session = csvutils.prepare_for_csv(session)
+            expanded_session = utils.prepare_for_csv(session)
             max_len = 0
             mapping = {}
             result = []
@@ -186,8 +185,12 @@ class JSONClient():
                         writer.writerow(el)
                     except ValueError:
                         logger.error("not written: {0}".format(el))
-                csvfiles.append(fname)
 
+            if not os.path.exists(fname):
+                logger.error("No csv saved")
+            else:
+                logger.error("Saved: {0}".format(fname))
+                csvfiles.append(fname)
             csvnum += 1
 
         return csvfiles
