@@ -78,6 +78,64 @@ class DBClient():
 
     def write_plugin_into_db(self, session_dic, stats):
         table_name = self.tables['raw']
+        insert_query = 'INSERT OR IGNORE INTO ' + table_name + ' (%s) values'
+        httpid_inserted = []  # FIXME keep track of duplicates
+
+        session = {'session_url': session_dic['session_url'],
+                   'session_start': session_dic['session_start'],
+                   'probe_id': session_dic['probe_id'],
+                   'full_load_time': session_dic['full_load_time'],
+                   'mem': int(stats[session_dic['session_url']]['mem']),
+                   'cpu': int(stats[session_dic['session_url']]['cpu'])
+                   }
+        objects = {}
+
+        metacolumns = ['uri', 'first_bytes_rcv', 'rcv_time', 'local_port', 'local_ip', 'remote_port', 'remote_ip',
+                       'syn_time', 'app_rtt', 'request_ts', 'end_time', 'content_type', 'body_bytes']
+
+        for httpid, obj in session_dic['entries'].items():
+            if httpid in httpid_inserted:
+                continue
+            objects[httpid] = dict.fromkeys(metacolumns)
+            for key in metacolumns:
+                try:
+                    if key == 'uri' and len(obj[key]) > 255:
+                        logger.warning("Truncating uri: {0}".format(obj[key]))
+                        objects[httpid][key] = obj[key][:254]
+                    objects[httpid][key] = obj[key]
+                except KeyError:
+                    logger.error("KeyError: {}".format(key))
+                    logger.error(obj)
+                    objects[httpid][key] = None
+
+        logger.debug("Found {0} objects for session to {1}".format(len(objects), session['session_url']))
+        columns = '''httpid, session_url, session_start, probe_id, full_load_time, uri, first_bytes_rcv, rcv_time,
+        local_port, local_ip, remote_port, remote_ip, syn_time, app_rtt, request_ts, end_time, content_type,
+        body_bytes, cpu_percent, mem_percent'''
+
+        for k, v in objects.items():
+            q = insert_query % columns
+            q += "(%s, '%s', '%s', %d, %d, '%s', '%s', %d," % (k, session['session_url'], session['session_start'],
+                                                               session['probe_id'], session['full_load_time'], v['uri'],
+                                                               v['first_bytes_rcv'], v['rcv_time'])
+            q += "'%s', '%s', '%s', '%s'," % (v['local_port'], v['local_ip'], v['remote_port'], v['remote_ip'])
+
+            q += "%s, %s, '%s', '%s', '%s', %d, %d, %d)" % (v['syn_time'], v['app_rtt'], v['request_ts'], v['end_time'],
+                                                            v['content_type'], v['body_bytes'], session['cpu'],
+                                                            session['mem'])
+            logger.debug("trying: {}".format(q))
+            try:
+                row_id = self.conn.execute_query(q)
+                httpid_inserted.append(k)
+            except sqlite3.Error as e:
+                logger.error("Failed: {}".format(q))
+                logger.error("sqlite3 ({0})".format(e))
+                continue
+
+        self._generate_sid_on_table()
+
+    def old_write_plugin_into_db(self, session_dic, stats):
+        table_name = self.tables['raw']
         insert_query = 'INSERT OR IGNORE INTO ' + table_name + ' (%s) values (%s)'
         update_query = 'UPDATE ' + table_name + ' SET mem_percent = %d, cpu_percent = %d where rowid = %d'
         httpid_inserted = []  # FIXME keep track of duplicates
@@ -88,7 +146,6 @@ class DBClient():
         full_load_time = session_dic['full_load_time']
 
         entries = session_dic['entries']
-
         local_port = None
         local_ip = None
         remote_port = None
@@ -113,8 +170,8 @@ class DBClient():
                     var = obj[v_name]
                 except KeyError:
                     logger.error("KeyError: {} not found".format(v_name))
-                    logger.error(obj)
-                    sys.exit(1)
+                    logger.error("KeyError: {}".format(obj))
+                    #sys.exit(1)
             #local_port = obj['local_port']
             #local_ip = obj['local_ip']
             #remote_port = obj['remote_port']
@@ -147,11 +204,10 @@ class DBClient():
                        cpu, mem)
 
             to_execute = insert_query % (cols, values)
-
             try:
                 row_id = self.conn.execute_query(to_execute)
             except sqlite3.Error as e:
-                logger.error(to_execute)
+                logger.error("Failed: ", to_execute)
                 logger.error("sqlite3 ({0})".format(e))
                 continue
 

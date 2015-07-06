@@ -7,3 +7,5 @@ probe/session_bkp/*
 probe/thread_*
 session_bkp/*
 probe.db
+script/*.out
+clean.sh
