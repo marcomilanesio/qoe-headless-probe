@@ -88,22 +88,43 @@ class DBClient():
         full_load_time = session_dic['full_load_time']
 
         entries = session_dic['entries']
+
+        local_port = None
+        local_ip = None
+        remote_port = None
+        remote_ip = None
+        syn_time = None
+        app_rtt = None
+        request_ts = None
+        end_time = None
+        content_type = None
+        body_bytes = None
+        vars = [local_port, local_ip, remote_port, remote_ip, syn_time, app_rtt, request_ts, end_time, content_type, body_bytes]
+        #var_names = [k for k, v in locals().items() if v in vars]
         for httpid, obj in entries.items():
             if httpid in httpid_inserted:
                 continue
             uri = obj['uri']
             first_bytes_rcv = obj['first_bytes_rcv']
             rcv_time = obj['rcv_time']
-            local_port = obj['local_port']
-            local_ip = obj['local_ip']
-            remote_port = obj['remote_port']
-            remote_ip = obj['remote_ip']
-            syn_time = obj['syn_time']
-            app_rtt = obj['app_rtt']
-            request_ts = obj['request_ts']
-            end_time = obj['end_time']
-            content_type = obj['content_type']
-            body_bytes = obj['body_bytes']
+            for var in vars:
+                v_name = [k for k, v in locals().items() if v is var][0]
+                try:
+                    var = obj[v_name]
+                except KeyError:
+                    logger.error("KeyError: {} not found".format(v_name))
+                    logger.error(obj)
+                    sys.exit(1)
+            #local_port = obj['local_port']
+            #local_ip = obj['local_ip']
+            #remote_port = obj['remote_port']
+            #remote_ip = obj['remote_ip']
+            #syn_time = obj['syn_time']
+            #app_rtt = obj['app_rtt']
+            #request_ts = obj['request_ts']
+            #end_time = obj['end_time']
+            #content_type = obj['content_type']
+            #body_bytes = obj['body_bytes']
 
             mem = int(stats[session_url]['mem'])
             cpu = int(stats[session_url]['cpu'])
