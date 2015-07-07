@@ -306,7 +306,7 @@ class DBClient():
         res = self.conn.execute_query(q)
         if len(res) == 0:
             logger.warning('pre_process: no sids found')
-            return
+            return None
 
         d = dict(res)
         logger.debug("{0} session(s) to preprocess: sids {1} ".format(len(d), d.keys()))
@@ -345,12 +345,24 @@ class DBClient():
             sum(rcv_time) as s_rcv, sum(body_bytes) as s_body, sum(syn_time) as s_syn from %s where sid = %d
             group by remote_ip;''' % (self.tables['raw'], sid)
             res = self.conn.execute_query(q)
-
+            logger.debug("Found {} lines for passive measurements".format(len(res)))
             page_dim = 0
+            count_error = 0
             for tup in res:
                 #ip, nr_obj, sum_http, sum_rcv_time, netw_bytes, sum_syn
                 test_for_none = list(tup)
-                ok = [test_for_none[0]]  # ip
+                ip = test_for_none[0]
+                if not ip:
+                    if count_error == len(res):
+                        logger.error("Unable to get ANY passive data for sid: {}".format(sid))
+                        logger.error("Aborting.")
+                        return None
+                    logger.error("Unable to get passive data for sid: {}".format(sid))
+                    logger.error("skipping...")
+                    count_error += 1
+                    continue
+
+                ok = [ip]  # ip
                 for el in test_for_none[1:]:
                     try:
                         ok.append(int(el))

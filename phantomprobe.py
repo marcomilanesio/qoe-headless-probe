@@ -155,6 +155,11 @@ class PhantomProbe():
         self.dbcli.load_to_db(stats)
         logger.info('Ended browsing to %s' % self.url)
         self.passive = self.dbcli.pre_process_raw_table()
+        if not self.passive:
+            logger.error("Unable to retrieve passive measurements.")
+            logger.error("Check if Tstat is running properly.")
+            logger.error("Quitting.")
+            return False
         utils.clean_tmp_files(self.backup_dir, [self.tstat_out_file, self.harfile], self.url, False)
         logger.debug('Saved backup files.')
         return True
