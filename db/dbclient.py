@@ -295,7 +295,6 @@ class DBClient():
             self.conn.execute_query(query)
         logger.info('inserted active measurements for sid %s: ' % sid)
 
-
     def pre_process_raw_table(self):
         # TODO: page_dim as sum of netw_bytes in summary
         logger.info('Pre-processing data from raw table...')
@@ -349,10 +348,25 @@ class DBClient():
 
             page_dim = 0
             for tup in res:
-                dic[str(sid)]['browser'].append({'ip': tup[0], 'nr_obj': int(tup[1]), 'sum_http': int(tup[2]),
-                                                 'sum_rcv_time': int(tup[3]), 'netw_bytes': int(tup[4]),
-                                                 'sum_syn': int(tup[5])})
-                page_dim += int(tup[4])
+                #ip, nr_obj, sum_http, sum_rcv_time, netw_bytes, sum_syn
+                test_for_none = list(tup)
+                ok = [test_for_none[0]]  # ip
+                for el in test_for_none[1:]:
+                    try:
+                        ok.append(int(el))
+                    except TypeError:
+                        logger.error("TypeError on test_for_none: {}".format(test_for_none))
+                        ok.append(None)
+                        pass
+
+                dic[str(sid)]['browser'].append({'ip': ok[0], 'nr_obj': ok[1], 'sum_http': ok[2],
+                                                 'sum_rcv_time': ok[3], 'netw_bytes': ok[4],
+                                                 'sum_syn': ok[5]})
+                page_dim += ok[4]
+                #dic[str(sid)]['browser'].append({'ip': tup[0], 'nr_obj': int(tup[1]), 'sum_http': int(tup[2]),
+                #                                 'sum_rcv_time': int(tup[3]), 'netw_bytes': int(tup[4]),
+                #                                 'sum_syn': int(tup[5])})
+                #page_dim += int(tup[4])
 
             dic[str(sid)].update({'page_dim': page_dim})
 
