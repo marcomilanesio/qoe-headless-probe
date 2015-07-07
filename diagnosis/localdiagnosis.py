@@ -44,12 +44,8 @@ class LocalDiagnosisManager():
             return None
 
     def prepare_for_diagnosis(self, passive, active):
-        try:
-            assert len(passive) == 1
-        except AssertionError as e:
-            logger.error("len(passive) = {0} ".format(len(passive)))
-            logger.error(e)
-            exit(1)
+        assert len(passive) == 1
+
         sid = list(passive.keys())[0]
         locals = self.get_local_data()
         if not locals:
@@ -93,7 +89,15 @@ class LocalDiagnosisManager():
 
     def run_diagnosis(self, passive, active):
         diagnosis = {'result': None, 'details': None}
-        sid, cs_p, cs_a, tools = self.prepare_for_diagnosis(passive, active)
+        try:
+            sid, cs_p, cs_a, tools = self.prepare_for_diagnosis(passive, active)
+        except AssertionError as e:
+            logger.error("len(passive) = {0} ".format(len(passive)))
+            logger.error("No passive data found.")
+            logger.error(e)
+            diagnosis['result'] = 'Error in measurements'
+            diagnosis['details'] = 'No passive data found'
+            return diagnosis
 
         if cs_p['full_load_time'] < tools['time_th']:
             diagnosis['result'] = 'No problem found'

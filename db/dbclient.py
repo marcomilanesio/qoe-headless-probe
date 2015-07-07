@@ -345,7 +345,7 @@ class DBClient():
             sum(rcv_time) as s_rcv, sum(body_bytes) as s_body, sum(syn_time) as s_syn from %s where sid = %d
             group by remote_ip;''' % (self.tables['raw'], sid)
             res = self.conn.execute_query(q)
-            logger.debug("Found {} lines for passive measurements".format(len(res)))
+            logger.debug("Found {} rows for passive measurements".format(len(res)))
             page_dim = 0
             count_error = 0
             for tup in res:
@@ -356,6 +356,8 @@ class DBClient():
                     logger.error("Unable to get passive data for sid: {}".format(sid))
                     logger.error("skipping...")
                     count_error += 1
+                    logger.error("count_error = {0}, len(res) = {1}".format(count_error, len(res)))
+                    logger.error("count_error == len(res): ".format(count_error == len(res)))
                     if count_error == len(res):
                         logger.error("Unable to get ANY passive data for sid: {}".format(sid))
                         logger.error("Aborting.")
