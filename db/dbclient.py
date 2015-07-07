@@ -113,22 +113,32 @@ class DBClient():
         local_port, local_ip, remote_port, remote_ip, syn_time, app_rtt, request_ts, end_time, content_type,
         body_bytes, cpu_percent, mem_percent'''
 
+
         for k, v in objects.items():
             q = insert_query % columns
+            q += "(" + ",".join(["?"]*len(columns.split(","))) + ")"
+
+            tup = (k, session['session_url'], session['session_start'], session['probe_id'], session['full_load_time'],
+                   v['uri'], v['first_bytes_rcv'], v['rcv_time'], v['local_port'], v['local_ip'], v['remote_port'],
+                   v['remote_ip'], v['syn_time'], v['app_rtt'], v['request_ts'], v['end_time'], v['content_type'],
+                   v['body_bytes'], session['cpu'], session['mem'])
+
+            '''
             q += "(%s, '%s', '%s', %d, %d, '%s', '%s', %d," % (k, session['session_url'], session['session_start'],
                                                                session['probe_id'], session['full_load_time'], v['uri'],
                                                                v['first_bytes_rcv'], v['rcv_time'])
             q += "'%s', '%s', '%s', '%s'," % (v['local_port'], v['local_ip'], v['remote_port'], v['remote_ip'])
 
+
             q += "%s, %s, '%s', '%s', '%s', %d, %d, %d)" % (v['syn_time'], v['app_rtt'], v['request_ts'], v['end_time'],
                                                             v['content_type'], v['body_bytes'], session['cpu'],
                                                             session['mem'])
-            logger.debug("trying: {}".format(q))
+            '''
             try:
-                row_id = self.conn.execute_query(q)
+                row_id = self.conn.execute_query(q, tup)
                 httpid_inserted.append(k)
             except sqlite3.Error as e:
-                logger.error("Failed: {}".format(q))
+                logger.error("Failed to insert: {}".format(v))
                 logger.error("sqlite3 ({0})".format(e))
                 continue
 
