@@ -91,7 +91,7 @@ class LocalDiagnosisManager():
         diagnosis = {'result': None, 'details': None}
         try:
             sid, cs_p, cs_a, tools = self.prepare_for_diagnosis(passive, active)
-        except AssertionError as e:
+        except TypeError as e:
             logger.error("len(passive) = {0} ".format(len(passive)))
             logger.error("No passive data found.")
             logger.error(e)
