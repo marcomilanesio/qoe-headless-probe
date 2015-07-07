@@ -353,13 +353,13 @@ class DBClient():
                 test_for_none = list(tup)
                 ip = test_for_none[0]
                 if not ip:
+                    logger.error("Unable to get passive data for sid: {}".format(sid))
+                    logger.error("skipping...")
+                    count_error += 1
                     if count_error == len(res):
                         logger.error("Unable to get ANY passive data for sid: {}".format(sid))
                         logger.error("Aborting.")
                         return None
-                    logger.error("Unable to get passive data for sid: {}".format(sid))
-                    logger.error("skipping...")
-                    count_error += 1
                     continue
 
                 ok = [ip]  # ip
