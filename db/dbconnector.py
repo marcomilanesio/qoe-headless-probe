@@ -30,6 +30,7 @@ class DBConnector():
         else:  # parameters in insert as tuple
             c.execute(query, tup)
             self.conn.commit()
+            return c.lastrowid
 
     def close_conn(self):
         self.conn.close()

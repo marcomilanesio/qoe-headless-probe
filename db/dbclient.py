@@ -113,7 +113,6 @@ class DBClient():
         local_port, local_ip, remote_port, remote_ip, syn_time, app_rtt, request_ts, end_time, content_type,
         body_bytes, cpu_percent, mem_percent'''
 
-
         for k, v in objects.items():
             q = insert_query % columns
             q += "(" + ",".join(["?"]*len(columns.split(","))) + ")"
