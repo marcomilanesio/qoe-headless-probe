@@ -173,9 +173,9 @@ class PhantomProbe():
                 os.remove(tracefile)
             l = LocalDiagnosisManager(self.dbcli, self.url)
             self.diagnosis = l.run_diagnosis(self.passive, self.active)
+            self.send_results()
         else:
             self.diagnosis = {"Warning": "Unable to perform browsing"}
-        self.send_results()
 
     def send_results(self):
         jc = JSONClient(self.config, self.dbcli)
