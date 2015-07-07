@@ -89,15 +89,19 @@ class LocalDiagnosisManager():
 
     def run_diagnosis(self, passive, active):
         diagnosis = {'result': None, 'details': None}
-        try:
-            sid, cs_p, cs_a, tools = self.prepare_for_diagnosis(passive, active)
-        except TypeError as e:
-            logger.error("len(passive) = {0} ".format(len(passive)))
+        if not passive:
             logger.error("No passive data found.")
-            logger.error(e)
             diagnosis['result'] = 'Error in measurements'
             diagnosis['details'] = 'No passive data found'
             return diagnosis
+        else:
+            try:
+                sid, cs_p, cs_a, tools = self.prepare_for_diagnosis(passive, active)
+            except AssertionError:
+                logger.error("len(passive) = {0}".format(len(passive)))
+                diagnosis['result'] = 'Error in measurements (len(passive))'
+                diagnosis['details'] = 'No meaningful passive data found'
+                return diagnosis
 
         if cs_p['full_load_time'] < tools['time_th']:
             diagnosis['result'] = 'No problem found'
