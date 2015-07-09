@@ -14,7 +14,7 @@ logger = logging.getLogger('DBClient')
 
 class DBClient():
 
-    def __init__(self, configuration, loc_info, create=False):
+    def __init__(self, configuration, loc_info=None, create=False):
         self.dbconfig = configuration.get_database_configuration()
         try:
             self.conn = DBConnector(self.dbconfig['dbfile'])

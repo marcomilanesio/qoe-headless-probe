@@ -108,10 +108,16 @@ class PhantomProbe():
             sys.exit(-1)
 
         logger.debug('Backup dir set at: %s' % self.backup_dir)
-        self.loc_info = utils.get_location()
-        if not self.loc_info:
-            logger.warning("No info on location retrieved.")
-        self.dbcli = DBClient(self.config, self.loc_info, create=True)
+        try:
+            self.dbcli = DBClient(self.config)
+            self.dbcli.get_probe_id()
+            logger.info("Probe data already stored.")
+        except Exception:
+            self.loc_info = utils.get_location()
+            if not self.loc_info:
+                logger.warning("No info on location retrieved.")
+            self.dbcli = DBClient(self.config, self.loc_info, create=True)
+
         try:
             self.flumemanager = FlumeManager(self.config)
             self.flumemanager.start_flume()
@@ -192,13 +198,13 @@ class PhantomProbe():
                 logger.error("Unable to stop flume")
         else:
             logger.info("Sending data to server...")
-            try:
-                jc.send_csv()
-            except TimeoutError:
-                logger.error("Timeout in server connection")
-                pass
-            finally:
-                logger.info("Done.")
+            #try:
+            #    jc.send_csv()
+            #except TimeoutError:
+            #    logger.error("Timeout in server connection")
+            #    pass
+            #finally:
+            #    logger.info("Done.")
         self.dbcli.update_sent(to_update)
         try:
             for csv_path_fname in csv_path_fname_list:
