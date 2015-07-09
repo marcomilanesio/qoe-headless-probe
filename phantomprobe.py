@@ -198,13 +198,13 @@ class PhantomProbe():
                 logger.error("Unable to stop flume")
         else:
             logger.info("Sending data to server...")
-            #try:
-            #    jc.send_csv()
-            #except TimeoutError:
-            #    logger.error("Timeout in server connection")
-            #    pass
-            #finally:
-            #    logger.info("Done.")
+            try:
+                jc.send_csv()
+            except TimeoutError:
+                logger.error("Timeout in server connection")
+                pass
+            finally:
+                logger.info("Done.")
         self.dbcli.update_sent(to_update)
         try:
             for csv_path_fname in csv_path_fname_list:
