@@ -45,11 +45,11 @@ class BrowserThread(threading.Thread):
 
     def run(self, timeout):
         def target():
-            o = open(self.outfile, 'a')
-            e = open(self.errfile, 'a')
+            #o = open(self.outfile, 'a')
+            #e = open(self.errfile, 'a')
             logger.debug('Browsing Thread started')
             FNULL = open(os.devnull, 'w')
-            self.process = subprocess.Popen(self.cmd, stdout=FNULL, stderr=e, shell=True)
+            self.process = subprocess.Popen(self.cmd, stdout=FNULL, stderr=FNULL, shell=True)
             memtable = []
             cputable = []
             while self.process.poll() is None:
