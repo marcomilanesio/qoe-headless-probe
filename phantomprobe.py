@@ -41,6 +41,7 @@ class TstatManager():
         subprocess.Popen(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False)
 
     def stop_capture(self):
+        logger.debug("Stopping tstat...")
         p = subprocess.Popen(self.stop, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False).wait()
         if p > 0:
             return False
@@ -137,8 +138,6 @@ class PhantomProbe():
         self.tstatmanager = TstatManager(self.config)
         try:
             self.tstatmanager.start_capture()
-            logger.info("Sleeping 10 secs...")
-            time.sleep(10)
             logger.info("Tstat.check_tstat. ret = {}".format(self.tstatmanager.check_tstat()))
             logger.info("start.out process launched")
         except AttributeError:
@@ -163,7 +162,9 @@ class PhantomProbe():
         if not os.path.exists(self.tstat_out_file):
             logger.error('tstat outfile missing. Check your network configuration.')
             sys.exit("tstat outfile missing. Check your network configuration.")
-            
+
+        logger.debug("Sleeping 10 sec")
+        time.sleep(10)
         if not self.tstatmanager.stop_capture():
             logger.error("Unable to stop tstat.")
         else:
