@@ -205,12 +205,14 @@ class JSONClient():
                     data = ''.join(f.readlines())
 
                     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
+                    tosend = json.dumps(data)
                     try:
                         sock.connect((HOST, PORT))
-                        tosend = json.dumps(data)
                         sock.sendall(bytes(tosend + "\n", "utf-8"))
                         received = str(sock.recv(1024), "utf-8")
+                    except ConnectionRefusedError:
+                        logger.error("Unable to connect to server")
+                        received = None
                     finally:
                         sock.close()
 
