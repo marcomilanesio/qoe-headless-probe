@@ -45,6 +45,11 @@ class TstatManager():
             return False
         return True
 
+    def check_tstat(self):
+        ps = subprocess.Popen(('ps', 'aux'), stdout=subprocess.PIPE)
+        output = subprocess.check_output(('grep', 'tstat'), stdin=ps.stdout)
+        ps.wait()
+        return int(output.split()[1])
 
 class FlumeNotFoundError(FileNotFoundError):
     pass
@@ -131,6 +136,7 @@ class PhantomProbe():
         try:
             self.tstatmanager.start_capture()
             time.sleep(5)
+            logger.info("Tstat.check_tstat. ret = {}".format(self.tstatmanager.check_tstat()))
             logger.info("start.out process launched")
         except AttributeError:
             logger.error("Unable to start tstat process. Quit.")
