@@ -130,6 +130,7 @@ class PhantomProbe():
         self.tstatmanager = TstatManager(self.config)
         try:
             self.tstatmanager.start_capture()
+            time.sleep(5)
             logger.info("start.out process launched")
         except AttributeError:
             logger.error("Unable to start tstat process. Quit.")
