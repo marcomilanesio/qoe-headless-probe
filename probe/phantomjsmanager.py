@@ -61,8 +61,8 @@ class BrowserThread(threading.Thread):
             self.mem = float(sum(memtable) / len(memtable))
             self.cpu = float(sum(cputable) / len(cputable))
             logger.debug('Browsing Thread finished')
-            o.close()
-            e.close()
+            #o.close()
+            #e.close()
 
         thread = threading.Thread(target=target)
         thread.start()
