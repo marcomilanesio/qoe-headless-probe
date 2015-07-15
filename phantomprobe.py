@@ -163,8 +163,8 @@ class PhantomProbe():
             logger.error('tstat outfile missing. Check your network configuration.')
             sys.exit("tstat outfile missing. Check your network configuration.")
 
-        logger.debug("Sleeping 10 sec")
-        time.sleep(10)
+        #logger.debug("Sleeping 10 sec")
+        #time.sleep(10)
         if not self.tstatmanager.stop_capture():
             logger.error("Unable to stop tstat.")
         else:
