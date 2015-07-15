@@ -137,7 +137,8 @@ class PhantomProbe():
         self.tstatmanager = TstatManager(self.config)
         try:
             self.tstatmanager.start_capture()
-            time.sleep(5)
+            logger.info("Sleeping 10 secs...")
+            time.sleep(10)
             logger.info("Tstat.check_tstat. ret = {}".format(self.tstatmanager.check_tstat()))
             logger.info("start.out process launched")
         except AttributeError:
@@ -148,6 +149,7 @@ class PhantomProbe():
     def browse(self):
         try:
             stats = self.launcher.browse_url(self.url)
+            logger.info("Got data from browse_url")
         except AttributeError:
             logger.error("Problems in browser thread. Aborting session...")
             logger.error("Forcing tstat to stop.")
