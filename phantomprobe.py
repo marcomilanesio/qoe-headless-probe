@@ -37,6 +37,7 @@ class TstatManager():
 
     def start_capture(self):
         cmd = "%s %s %s %s %s" % (self.start, self.tstatpath, self.interface, self.netfile, self.outdir)
+        print(cmd)
         subprocess.Popen(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False)
 
     def stop_capture(self):
@@ -50,6 +51,7 @@ class TstatManager():
         output = subprocess.check_output(('grep', 'tstat'), stdin=ps.stdout)
         ps.wait()
         return int(output.split()[1])
+
 
 class FlumeNotFoundError(FileNotFoundError):
     pass
