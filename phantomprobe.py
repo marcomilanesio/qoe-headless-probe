@@ -37,7 +37,6 @@ class TstatManager():
 
     def start_capture(self):
         cmd = "%s %s %s %s %s" % (self.start, self.tstatpath, self.interface, self.netfile, self.outdir)
-        print(cmd)
         subprocess.Popen(cmd.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False)
 
     def stop_capture(self):

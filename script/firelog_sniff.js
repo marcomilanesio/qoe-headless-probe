@@ -214,7 +214,7 @@ if (system.args.length === 1) {
     page.customHeaders = {'Accept-Encoding': 'gzip;q=0'};
 //#######
     page.customHeaders = {"httpid" : "1"};
-    
+
     page.onResourceRequested = function (req) {
         
         page.resources[req.id] = {            

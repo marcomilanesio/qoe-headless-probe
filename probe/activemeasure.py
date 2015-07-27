@@ -184,7 +184,7 @@ class ActiveMonitor(object):
         result = {}
         probed_ip = {}
         for sid, dic in self.inserted_sid.items():
-            print("active ", dic.keys())
+            #print("active ", dic.keys())
             to_insert = []
             url = dic['url']
             server_ip = dic['complete']
