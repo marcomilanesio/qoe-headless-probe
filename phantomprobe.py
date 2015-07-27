@@ -241,6 +241,7 @@ if __name__ == '__main__':
     parser = OptionParser()
     parser.add_option("-c", "--conf", dest="conf_file", type="string", help="specify a configuration file", metavar="FILE")
     parser.add_option("-u", "--url", dest="url", type="string", help="specify a url", metavar="URL")
+    parser.add_option("-l", "--loop", dest="loop", action="store_true", help="toggle infinite loop")
     (options, args) = parser.parse_args()
     if not options.url:
         print("Use -h for complete list of options")
@@ -258,5 +259,16 @@ if __name__ == '__main__':
         conffile = options.conf_file
 
     f = PhantomProbe(conffile, url)
-    f.execute()
-    print(f.get_result())
+    if options.loop:
+        while True:
+            try:
+                f.execute()
+                print(f.get_result())
+            except KeyboardInterrupt:
+                print("Terminating loop.")
+                break
+    else:
+        f.execute()
+        print(f.get_result())
+
+    print("Ciao.")
