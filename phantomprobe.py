@@ -162,8 +162,8 @@ class PhantomProbe():
             logger.error('tstat outfile missing. Check your network configuration.')
             sys.exit("tstat outfile missing. Check your network configuration.")
 
-        logger.debug("Sleeping 10 sec")
-        time.sleep(10)
+        #logger.debug("Sleeping 10 sec")
+        #time.sleep(10)
         if not self.tstatmanager.stop_capture():
             logger.error("Unable to stop tstat.")
         else:
@@ -258,16 +258,19 @@ if __name__ == '__main__':
             sys.exit(0)
         conffile = options.conf_file
 
-    f = PhantomProbe(conffile, url)
     if options.loop:
         while True:
             try:
+                f = PhantomProbe(conffile, url)
                 f.execute()
                 print(f.get_result())
+                print("Waiting for the next run...")
+                time.sleep(10)
             except KeyboardInterrupt:
                 print("Terminating loop.")
                 break
     else:
+        f = PhantomProbe(conffile, url)
         f.execute()
         print(f.get_result())
 
