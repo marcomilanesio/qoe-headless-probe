@@ -21,6 +21,7 @@
 import logging
 import json
 from .cusum import Cusum
+from collections import OrderedDict
 
 logger = logging.getLogger('LocalDiagnosisManager')
 
@@ -43,10 +44,40 @@ class LocalDiagnosisManager():
         except:
             return None
 
-    def prepare_for_diagnosis(self, passive, active):
-        assert len(passive) == 1
+    def prepare_for_diagnosis(self, sid):
+        pkeys = ['sid', 'session_url', 'session_start', 'server_ip', 'full_load_time',
+                        'page_dim', 'cpu_percent', 'mem_percent', 'is_sent']
+        akeys = ['sid', 'session_url', 'ip_dest', 'remote_ip', 'ping', 'trace']
+        bkeys = ['sid', 'base_url', 'ip', 'netw_bytes', 'nr_obj', 'sum_syn', 'sum_http', 'sum_rcv_time']
+        passive = {}
+        active = []
+        browser = []
+        if not sid:
+            logger.error("sid not specified. Unable to run diagnosis.")
+            return
+        q = "select {0} from {1} where sid = {2} and session_url like '%{3}%'".format(','.join(pkeys), self.db.tables['aggr_sum'], sid, self.url)
+        res = self.db.execute(q)
 
-        sid = list(passive.keys())[0]
+        for idx, el in enumerate(res[0]):
+            passive[pkeys[idx]] = el
+        q = "select {0} from {1} where sid = {2} and session_url like '%{3}%'".format(','.join(akeys), self.db.tables['active'], sid, self.url)
+        res = self.db.execute(q)
+        for row in res:
+            d = {}
+            for idx, el in enumerate(row):
+                try:
+                    d[akeys[idx]] = json.loads(el)
+                except (TypeError, ValueError):
+                    d[akeys[idx]] = el
+            active.append(d)
+
+        q = "select {0} from {1} where sid = {2}".format(','.join(bkeys), self.db.tables['aggr_det'], sid)
+        res = self.db.execute(q)
+        for row in res:
+            d = {}
+            for idx, el in enumerate(row):
+                d[bkeys[idx]] = el
+            browser.append(d)
         locals = self.get_local_data()
         if not locals:
             logger.warning("First time hitting {0}: using default values.".format(self.url))
@@ -55,11 +86,12 @@ class LocalDiagnosisManager():
             cusumT2T1 = Cusum('cusumT2T1', 0, 0)
             cusumT3T2 = Cusum('cusumT3T2', 0, 0)
             cusumTHTTPTTCP = Cusum('cusumTHTTPTTCP', 0, 0)
-            time_th = passive[sid]['full_load_time'] + 1000
-            dim_th = passive[sid]['page_dim'] + 1500 * 5
-            http_th = sum([x['sum_http'] for x in passive[sid]['browser']]) + 50
-            tcp_th = sum([x['sum_syn'] for x in passive[sid]['browser']]) + 50
-            self.insert_first_locals(time_th, dim_th, http_th, tcp_th)
+            time_th = passive['full_load_time'] + 1000
+            http_th = sum([x['sum_http'] for x in browser]) + 50
+            tcp_th = sum([x['sum_syn'] for x in browser]) + 50
+            dim_th = passive['page_dim'] + 5000
+            #rcv_th = sum([x['sum_rcv_time'] for x in browser]) + 50  # TODO add rcv_th to local_diag
+            self.insert_first_locals(time_th, http_th, tcp_th, dim_th)
         else:
             num_hits = locals['count']
             cusumT1 = Cusum('cusumT1', locals['t1'], num_hits)
@@ -70,7 +102,6 @@ class LocalDiagnosisManager():
             dim_th = locals['dim_th']
             http_th = locals['http_th']
             tcp_th = locals['tcp_th']
-
         mem_th = cpu_th = 50
 
         tools = {'cusums':
@@ -85,38 +116,29 @@ class LocalDiagnosisManager():
                  'mem_th': mem_th,
                  'cpu_th': cpu_th}
 
-        return sid, passive[sid], active[sid], tools
+        return passive, active, browser, tools
 
-    def run_diagnosis(self, passive, active):
-        diagnosis = {'result': None, 'details': None}
-        if not passive:
-            logger.error("No passive data found.")
-            diagnosis['result'] = 'Error in measurements'
-            diagnosis['details'] = 'No passive data found'
+    def run_diagnosis(self, sid):
+        diagnosis = OrderedDict({'result': None, 'details': None})
+        passive_m, active_m, browser_m, tools = self.prepare_for_diagnosis(sid)
+        if not passive_m or not active_m or not browser_m or not tools:
+            diagnosis['result'] = 'Error'
+            diagnosis['details'] = 'Unable to retrieve data'
             return diagnosis
-        else:
-            try:
-                sid, cs_p, cs_a, tools = self.prepare_for_diagnosis(passive, active)
-            except AssertionError:
-                logger.error("len(passive) = {0}".format(len(passive)))
-                diagnosis['result'] = 'Error in measurements (len(passive))'
-                diagnosis['details'] = 'No meaningful passive data found'
-                return diagnosis
 
-        if cs_p['full_load_time'] < tools['time_th']:
-            diagnosis['result'] = 'No problem found'
+        if passive_m['full_load_time'] < tools['time_th']:
+            diagnosis['result'] = 'No problem found.'
         else:
-            if cs_p['mem_percent'] > tools['mem_th'] or cs_p['cpu_percent'] > tools['cpu_th']:
+            if passive_m['mem_percent'] > tools['mem_th'] or passive_m['cpu_percent'] > tools['cpu_th']:
                 diagnosis['result'] = 'Client overloaded'
-                diagnosis['details'] = "mem = {0}%, cpu = {1}%".format(cs_p['mem_percent'], cs_p['cpu_percent'])
+                diagnosis['details'] = "mem = {0}%, cpu = {1}%".format(passive_m['mem_percent'], passive_m['cpu_percent'])
                 return diagnosis
-
-            t_http = sum([x['sum_http'] for x in cs_p['browser']])
-            t_tcp = sum([x['sum_syn'] for x in cs_p['browser']])
+            t_http = sum([x['sum_http'] for x in browser_m])
+            t_tcp = sum([x['sum_syn'] for x in browser_m])
             if t_http < tools['http_th']:
-                if cs_p['page_dim'] > tools['dim_th']:
+                if passive_m['page_dim'] > tools['dim_th']:
                     diagnosis['result'] = 'Page too big'
-                    diagnosis['details'] = "page_dim = {0} bytes".format(cs_p['page_dim'])
+                    diagnosis['details'] = "page_dim = {0} bytes".format(passive_m['page_dim'])
                 elif t_tcp > tools['tcp_th']:
                     diagnosis['result'] = 'Web server too far'
                     diagnosis['details'] = "sum_syn = {0} ms".format(t_tcp)
@@ -125,7 +147,7 @@ class LocalDiagnosisManager():
                     diagnosis['details'] = "Unable to get more details"
             else:
                 diff = t_http - t_tcp
-                diagnosis['result'], diagnosis['details'] = self._check_network(cs_a, tools, diff)
+                diagnosis['result'], diagnosis['details'] = self._check_network(active_m, tools, diff)
 
         q = "update {0} set count = count + 1 where url like '%{1}%'"\
             .format(self.table_values, self.url)
@@ -137,13 +159,10 @@ class LocalDiagnosisManager():
     def _check_network(self, active, tools, diff):
         new_thresholds = {'t1': 0, 'd1': 0, 'd2': 0, 'dh': 0}
         result = details = None
-        for measure in active:
-            if 'trace' in measure.keys():
-                el = measure['trace']
-                list_ = json.loads(el)
-                first_hop = [x for x in list_ if x['hop_nr'] == 1][0]
-                second_hop = [x for x in list_ if x['hop_nr'] == 2][0]
-                third_hop = [x for x in list_ if x['hop_nr'] == 3][0]
+        trace = [x['trace'] for x in active if x['trace'] is not None][0]
+        first_hop = [x for x in trace if x['hop_nr'] == 1][0]
+        second_hop = [x for x in trace if x['hop_nr'] == 2][0]
+        third_hop = [x for x in trace if x['hop_nr'] == 3][0]
 
         gw_addr = first_hop['ip_addr']
         gw_rtt = first_hop['rtt']['avg']
@@ -183,7 +202,7 @@ class LocalDiagnosisManager():
                 details = "cusum on t_http - t_tcp"
             else:
                 result = 'Network generic (far)'
-                details = "unable to get more details"
+                details = "Unable to get more details"
 
         alternative = {'t1': gw_rtt, 'd1': second_rtt, 'd2': third_rtt, 'dh': diff}
         for k, v in new_thresholds.items():
