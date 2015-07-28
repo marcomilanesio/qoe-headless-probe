@@ -79,19 +79,32 @@ class LocalDiagnosisManager():
                 d[bkeys[idx]] = el
             browser.append(d)
         locals = self.get_local_data()
+
+        # get current data for cusum update
+        trace = [x['trace'] for x in active if x['trace'] is not None][0]
+        h1 = [x for x in trace if x['hop_nr'] == 1][0]['rtt']['max']
+        h2 = [x for x in trace if x['hop_nr'] == 2][0]['rtt']['max']
+        h3 = [x for x in trace if x['hop_nr'] == 3][0]['rtt']['max']
+        http_time = sum([x['sum_http'] for x in browser])
+        tcp_time = sum([x['sum_syn'] for x in browser])
         if not locals:
-            logger.warning("First time hitting {0}: using default values.".format(self.url))
+            logger.warning("First time hitting {0}: using current values.".format(self.url))
             # TODO: find a way to have threshold setting
-            cusumT1 = Cusum('cusumT1', 0, 0)
-            cusumT2T1 = Cusum('cusumT2T1', 0, 0)
-            cusumT3T2 = Cusum('cusumT3T2', 0, 0)
-            cusumTHTTPTTCP = Cusum('cusumTHTTPTTCP', 0, 0)
+            t1 = h1 + 0.1
+            d1 = h2 - h1 + 0.2
+            d2 = h3 - h2 + 0.3
+            dh = http_time - tcp_time + 0.5
+
+            cusumT1 = Cusum('cusumT1', t1)
+            cusumT2T1 = Cusum('cusumT2T1', d1)
+            cusumT3T2 = Cusum('cusumT3T2', d2)
+            cusumTHTTPTTCP = Cusum('cusumTHTTPTTCP', dh)
             time_th = passive['full_load_time'] + 1000
-            http_th = sum([x['sum_http'] for x in browser]) + 50
-            tcp_th = sum([x['sum_syn'] for x in browser]) + 50
+            http_th = http_time + 50
+            tcp_th = tcp_time + 50
             dim_th = passive['page_dim'] + 5000
             #rcv_th = sum([x['sum_rcv_time'] for x in browser]) + 50  # TODO add rcv_th to local_diag
-            self.insert_first_locals(time_th, http_th, tcp_th, dim_th)
+            self.insert_first_locals(time_th, http_th, tcp_th, dim_th, t1, d1, d2, dh)
         else:
             num_hits = locals['count']
             cusumT1 = Cusum('cusumT1', locals['t1'], num_hits)
@@ -102,6 +115,13 @@ class LocalDiagnosisManager():
             dim_th = locals['dim_th']
             http_th = locals['http_th']
             tcp_th = locals['tcp_th']
+
+            if num_hits < 60:
+                cusumT1.compute(h1)
+                cusumT2T1.compute(h2)
+                cusumT3T2.compute(h3)
+                cusumTHTTPTTCP.compute(http_time - tcp_time)
+
         mem_th = cpu_th = 50
 
         tools = {'cusums':
@@ -121,6 +141,7 @@ class LocalDiagnosisManager():
     def run_diagnosis(self, sid):
         diagnosis = OrderedDict({'result': None, 'details': None})
         passive_m, active_m, browser_m, tools = self.prepare_for_diagnosis(sid)
+
         if not passive_m or not active_m or not browser_m or not tools:
             diagnosis['result'] = 'Error'
             diagnosis['details'] = 'Unable to retrieve data'
@@ -175,7 +196,7 @@ class LocalDiagnosisManager():
         except TypeError:
             third_rtt = second_rtt * 2  # FIXME: case when third hop does not answer ping
 
-        if c_t1.compute([gw_rtt]):
+        if c_t1.compute(gw_rtt):
             result = 'Local congestion (LAN/GW)'
             details = "cusum on RTT to 1st hop {0}".format(gw_addr)
             new_thresholds['t1'] = c_t1.get_th()
@@ -222,10 +243,10 @@ class LocalDiagnosisManager():
         self.db.execute(q)
         logger.debug("Updated thresholds in diagnosis table")
 
-    def insert_first_locals(self, flt, http, tcp, dim):
+    def insert_first_locals(self, flt, http, tcp, dim, t1, d1, d2, dh):
         q = "insert into {0}(url, flt, http, tcp, dim, t1, d1, d2, dh, count) values "\
             .format(self.table_values)
-        q += "('{0}', {1}, {2}, {3}, {4}, 0, 0, 0, 0, 0)".format(self.url, flt, http, tcp, dim)
+        q += "('{0}', {1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}, 0)".format(self.url, flt, http, tcp, dim, t1, d1, d2, dh)
         self.db.execute(q)
 
     def store_diagnosis_result(self, sid, diagnosis):
