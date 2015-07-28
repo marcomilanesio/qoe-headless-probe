@@ -74,7 +74,7 @@ class DBClient():
         logger.debug("Got client %s" % probe_id)
         p = Parser(self.dbconfig['tstatfile'], self.dbconfig['harfile'], probe_id)
         to_insert = p.parse()
-        self.write_plugin_into_db(to_insert, stats)
+        return self.write_plugin_into_db(to_insert, stats)
 
     def write_plugin_into_db(self, session_dic, stats):
         table_name = self.tables['raw']
@@ -141,88 +141,7 @@ class DBClient():
                 logger.error("sqlite3 ({0})".format(e))
                 continue
 
-        self._generate_sid_on_table()
-
-    def old_write_plugin_into_db(self, session_dic, stats):
-        table_name = self.tables['raw']
-        insert_query = 'INSERT OR IGNORE INTO ' + table_name + ' (%s) values (%s)'
-        update_query = 'UPDATE ' + table_name + ' SET mem_percent = %d, cpu_percent = %d where rowid = %d'
-        httpid_inserted = []  # FIXME keep track of duplicates
-
-        session_url = session_dic['session_url']
-        session_start = session_dic['session_start']
-        probe_id = session_dic['probe_id']
-        full_load_time = session_dic['full_load_time']
-
-        entries = session_dic['entries']
-        local_port = None
-        local_ip = None
-        remote_port = None
-        remote_ip = None
-        syn_time = None
-        app_rtt = None
-        request_ts = None
-        end_time = None
-        content_type = None
-        body_bytes = None
-        vars = [local_port, local_ip, remote_port, remote_ip, syn_time, app_rtt, request_ts, end_time, content_type, body_bytes]
-        #var_names = [k for k, v in locals().items() if v in vars]
-        for httpid, obj in entries.items():
-            if httpid in httpid_inserted:
-                continue
-            uri = obj['uri']
-            first_bytes_rcv = obj['first_bytes_rcv']
-            rcv_time = obj['rcv_time']
-            for var in vars:
-                v_name = [k for k, v in locals().items() if v is var][0]
-                try:
-                    var = obj[v_name]
-                except KeyError:
-                    logger.error("KeyError: {} not found".format(v_name))
-                    logger.error("KeyError: {}".format(obj))
-                    #sys.exit(1)
-            #local_port = obj['local_port']
-            #local_ip = obj['local_ip']
-            #remote_port = obj['remote_port']
-            #remote_ip = obj['remote_ip']
-            #syn_time = obj['syn_time']
-            #app_rtt = obj['app_rtt']
-            #request_ts = obj['request_ts']
-            #end_time = obj['end_time']
-            #content_type = obj['content_type']
-            #body_bytes = obj['body_bytes']
-
-            mem = int(stats[session_url]['mem'])
-            cpu = int(stats[session_url]['cpu'])
-
-            if len(uri) > 255:
-                logger.warning("Truncating uri: {0}".format(uri))
-                uri = uri[:254]
-
-            cols = '''httpid, session_url, session_start, probe_id, full_load_time, uri, first_bytes_rcv, rcv_time,
-            local_port, local_ip, remote_port, remote_ip, syn_time, app_rtt, request_ts, end_time, content_type,
-            body_bytes, cpu_percent, mem_percent'''
-
-            values = '''{0}, '{1}', '{2}', {3}, {4}, '{5}',
-            '{6}', {7}, {8}, '{9}', {10}, '{11}',
-            {12}, {13}, '{14}', '{15}', '{16}', {17},
-            {18}, {19}
-            '''.format(httpid, session_url, session_start, probe_id, full_load_time, uri,
-                       first_bytes_rcv, rcv_time, local_port, local_ip, remote_port, remote_ip,
-                       syn_time, app_rtt, request_ts, end_time, content_type, body_bytes,
-                       cpu, mem)
-
-            to_execute = insert_query % (cols, values)
-            try:
-                row_id = self.conn.execute_query(to_execute)
-            except sqlite3.Error as e:
-                logger.error("Failed: ", to_execute)
-                logger.error("sqlite3 ({0})".format(e))
-                continue
-
-            httpid_inserted.append(httpid)
-
-        self._generate_sid_on_table()
+        return self._generate_sid_on_table()
 
     def _generate_sid_on_table(self):
         q = "select max(sid) from {0}".format(self.tables['raw'])
@@ -245,6 +164,7 @@ class DBClient():
                 self.conn.execute_query(query)
             except sqlite3.Error:
                 logger.error(query)
+            return max_sid
 
     def get_inserted_sid_addresses(self):
         result = {}
