@@ -171,7 +171,7 @@ class PhantomProbe():
         else:
             logger.info("tstat successfully stopped.")
 
-        self.dbcli.load_to_db(stats)
+        inserted_sid = self.dbcli.load_to_db(stats)
         logger.info('Ended browsing to %s' % self.url)
         self.passive = self.dbcli.pre_process_raw_table()
         if not self.passive:
@@ -181,17 +181,18 @@ class PhantomProbe():
             return False
         utils.clean_tmp_files(self.backup_dir, [self.tstat_out_file, self.harfile], self.url, False)
         logger.debug('Saved backup files.')
-        return True
+        return inserted_sid
 
     def execute(self):
-        if self.browse():
+        inserted_sid = self.browse()
+        if inserted_sid:
             monitor = ActiveMonitor(self.config, self.dbcli)
             self.active = monitor.run_active_measurement()
             logger.debug('Ended Active probing to url %s' % (self.url))
             for tracefile in [f for f in os.listdir('.') if f.endswith('.traceroute')]:
                 os.remove(tracefile)
             l = LocalDiagnosisManager(self.dbcli, self.url)
-            self.diagnosis = l.run_diagnosis(self.passive, self.active)
+            self.diagnosis = l.run_diagnosis(inserted_sid)
             self.send_results()
         else:
             self.diagnosis = {"Warning": "Unable to perform browsing"}
