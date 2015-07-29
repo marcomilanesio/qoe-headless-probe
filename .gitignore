@@ -9,3 +9,6 @@ session_bkp/*
 probe.db
 script/*.out
 clean.sh
+conf/firelog.conf
+testdiag.py
+conf/pisafiles.conf

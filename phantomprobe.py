@@ -263,6 +263,5 @@ if __name__ == '__main__':
 
     f = PhantomProbe(conffile, url)
     f.execute()
-    print(f.get_result())
-
-    print("Ciao.")
+    print(str(f.get_result()))
+    print("Bye.")

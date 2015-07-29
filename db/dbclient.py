@@ -28,8 +28,9 @@ class DBClient():
                        'probe': self.dbconfig['table_probe'],
                        'aggr_sum': self.dbconfig['table_aggr_sum'],
                        'aggr_det': self.dbconfig['table_aggr_det'],
-                       'diag_values': self.dbconfig['table_diag_values'],
-                       'diag_result': self.dbconfig['table_diag_result']}
+                       'passive_thresholds': self.dbconfig['table_diag_values_pth'],
+                       'diag_result': self.dbconfig['table_diag_result'],
+                       'cusum_th': self.dbconfig['table_cusum_th']}
         if create:
             self.create_tables()
 
@@ -39,8 +40,9 @@ class DBClient():
              cq.create_active_table.format(self.tables['active']),
              cq.create_aggregate_summary.format(self.tables['aggr_sum']),
              cq.create_aggregate_details.format(self.tables['aggr_det']),
-             cq.create_local_diagnosis.format(self.tables['diag_values']),
-             cq.create_local_diagnosis_result.format(self.tables['diag_result'])]
+             cq.create_local_diagnosis_pth.format(self.tables['passive_thresholds']),
+             cq.create_local_diagnosis_result.format(self.tables['diag_result']),
+             cq.create_local_cusum.format(self.tables['cusum_th'])]
         for query in q:
             try:
                 self.conn.execute_query(query)

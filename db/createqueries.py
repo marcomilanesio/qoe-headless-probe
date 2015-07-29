@@ -56,16 +56,12 @@ create_aggregate_details = '''CREATE TABLE IF NOT EXISTS {0} (
             sum_rcv_time INT,
             unique(sid, base_url, ip)
         ) '''
-create_local_diagnosis = '''CREATE TABLE IF NOT EXISTS {0} (
+create_local_diagnosis_pth = '''CREATE TABLE IF NOT EXISTS {0} (
             url TEXT unique,
             flt INT,
             http INT,
             tcp INT,
             dim INT,
-            t1 real,
-            d1 real,
-            d2 real,
-            dh real,
             count int
         )'''
 create_local_diagnosis_result = '''CREATE TABLE IF NOT EXISTS {0} (
@@ -74,4 +70,12 @@ create_local_diagnosis_result = '''CREATE TABLE IF NOT EXISTS {0} (
             when_browsed datetime,
             diagnosis TEXT,
             unique(sid, url)
+        )'''
+create_local_cusum = '''CREATE TABLE IF NOT EXISTS {0} (
+            name TEXT unique,
+            url TEXT unique,
+            cusumT1 TEXT,
+            cusumD1 TEXT,
+            cusumD2 TEXT,
+            cusumDH TEXT
         )'''
