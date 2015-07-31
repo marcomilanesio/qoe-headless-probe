@@ -18,15 +18,18 @@
 # You should have received a copy of the GNU General Public License along with
 # this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-import math
+TRAINING = 100  # number of training diagnosis (for each cusum)
 
 
 class Cusum():
-    def __init__(self, name, th, value=0.0, mean=None, var=None, count=1, alpha=0.875, c=0.5):
+    def __init__(self, name, th, value=0.0, mean=None, var=None, count=0, alpha=0.75, c=0.5):
         self.name = name
-        self.th = th
         self.alpha = alpha
         self.c = c
+        if not th:
+            self.th = value
+        else:
+            self.th = th
         if not mean:
             self.mean = value
             self.var = 0.0
@@ -34,7 +37,7 @@ class Cusum():
             self.mean = mean
             self.var = var
         self.cusum = value
-        self.count = count  # keep track of count, locally
+        self.count = count
 
     def compute(self, item):
         self.count += 1
@@ -48,18 +51,20 @@ class Cusum():
             var = self.alpha * self.var + (1 - self.alpha) * pow((item - mean), 2)
             cusum = self.cusum + item - (self.mean + self.c * self.var)
             # Old update
-            # L = sample - (m_p + self.c * math.sqrt(var_p))  # incremento cusum
-            # cusum_p = self.cusum + L
+            #L = item - (mean + self.c * math.sqrt(var))  # incremento cusum
+            #cusum_p = self.cusum + L
 
         if cusum < 0:
             cusum = 0.0
 
-        if self.count < 50 and cusum > 0:
+        if self.count < TRAINING:
             self.adjust_th(cusum)
 
+        print(self.name, item, self.th, self.cusum)
+
         if cusum > self.th:
-            print("{0} = {1}".format(self.count, cusum), " > ", self.th)
-            if self.count > 50:
+            if self.count > TRAINING:
+                #print("anomaly detected {0} ({1})".format(self.name, self.count))
                 return cusum
 
         self.mean = mean

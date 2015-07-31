@@ -116,6 +116,7 @@ class LocalDiagnosisManager():
         logger.info("Cusum table updated.")
 
     def prepare_for_diagnosis(self, sid):
+        TRAINING = 100
         if not sid:
             logger.error("sid not specified. Unable to run diagnosis.")
             return
@@ -127,6 +128,7 @@ class LocalDiagnosisManager():
         if self.get_cusums(passive['session_url']):
             logger.info("Cusums loaded")
         # get current data for cusum update
+
         trace = [x['trace'] for x in active if x['trace'] is not None][0]
         h1 = [x for x in trace if x['hop_nr'] == 1][0]['rtt']['max']
         h2 = [x for x in trace if x['hop_nr'] == 2][0]['rtt']['max']
@@ -158,19 +160,19 @@ class LocalDiagnosisManager():
         dh = http_time - tcp_time + 0.5
 
         if not self.cusums:
-            self.cusums['cusumT1'] = Cusum(name='cusumT1', th=t1, value=h1)
+            self.cusums['cusumT1'] = Cusum(name='cusumT1', th=h1, value=h1)
             self.cusums['cusumD1'] = Cusum(name='cusumD1', th=d1, value=d1)
             self.cusums['cusumD2'] = Cusum(name='cusumD2', th=d2, value=d2)
             self.cusums['cusumDH'] = Cusum(name='cusumDH', th=dh, value=dh)
             self.update_cusums(passive['session_url'], first=True)
         else:
-            if self.cusums['cusumT1'].get_count() < 60:
+            if self.cusums['cusumT1'].get_count() < TRAINING:
                 self.cusums['cusumT1'].compute(h1)
-            if self.cusums['cusumD1'].get_count() < 60:
+            if self.cusums['cusumD1'].get_count() < TRAINING:
                 self.cusums['cusumD1'].compute(d1)
-            if self.cusums['cusumD2'].get_count() < 60:
+            if self.cusums['cusumD2'].get_count() < TRAINING:
                 self.cusums['cusumD2'].compute(d2)
-            if self.cusums['cusumDH'].get_count() < 60:
+            if self.cusums['cusumDH'].get_count() < TRAINING:
                 self.cusums['cusumDH'].compute(http_time - tcp_time)
             self.update_cusums(passive['session_url'])
 
@@ -196,6 +198,7 @@ class LocalDiagnosisManager():
 
         if passive_m['full_load_time'] < passive_thresholds['time_th']:
             diagnosis['result'] = 'No problem found.'
+            diagnosis['details'] = ''
         else:
             if passive_m['mem_percent'] > passive_thresholds['mem_th'] or passive_m['cpu_percent'] > passive_thresholds['cpu_th']:
                 diagnosis['result'] = 'Client overloaded'
@@ -245,8 +248,10 @@ class LocalDiagnosisManager():
             result = 'Local congestion (LAN/GW)'
             details = "cusum on RTT to 1st hop {0}".format(gw_addr)
         else:
-            d1 = [x-y for x, y in zip([second_rtt], [gw_rtt])]
-            d2 = [x-y for x, y in zip([third_rtt], [second_rtt])]
+            #d1 = [x-y for x, y in zip([second_rtt], [gw_rtt])]
+            #d2 = [x-y for x, y in zip([third_rtt], [second_rtt])]
+            d1 = second_rtt - gw_rtt
+            d2 = third_rtt - second_rtt
             if self.cusums['cusumD1'].compute(d1):
                 if self.cusums['cusumD2'].compute(d2):
                     result = 'Network congestion'
