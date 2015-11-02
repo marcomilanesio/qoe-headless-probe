@@ -46,6 +46,7 @@ class DBClient():
         for query in q:
             try:
                 self.conn.execute_query(query)
+                logger.debug("Created " + query)
             except sqlite3.OperationalError:
                 logger.error(query)
                 sys.exit(1)
@@ -64,8 +65,8 @@ class DBClient():
         ts = time.time()
         st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
         user = self.dbconfig['username']
-        for k in ['city', 'region']:
-            self.loc_info.update({k: self.loc_info[k].replace("'", "''")})
+        #for k in ['city', 'region']:
+        #    self.loc_info.update({k: self.loc_info[k].replace("'", "''")})
         q = "INSERT INTO {0} VALUES ('{1}', {2}, '{3}', '{4}')".format(self.tables['probe'], user, probe_id, st,
                                                                        json.dumps(self.loc_info))
         self.conn.execute_query(q)

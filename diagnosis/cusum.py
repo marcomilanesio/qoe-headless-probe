@@ -60,7 +60,7 @@ class Cusum():
         if self.count < TRAINING:
             self.adjust_th(cusum)
 
-        print(self.name, item, self.th, self.cusum)
+        #print(self.name, item, self.th, self.cusum)
 
         if cusum > self.th:
             if self.count > TRAINING:

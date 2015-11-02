@@ -9,6 +9,7 @@ import logging.config
 import time
 import datetime
 import signal
+import sqlite3
 
 from probe.configuration import Configuration
 from probe.phantomjsmanager import PJSLauncher, PhantomjsNotFoundError
@@ -119,10 +120,13 @@ class PhantomProbe():
             self.dbcli = DBClient(self.config)
             self.dbcli.get_probe_id()
             logger.info("Probe data already stored.")
-        except Exception:
+        except sqlite3.OperationalError:
             self.loc_info = utils.get_location()
             if not self.loc_info:
                 logger.warning("No info on location retrieved.")
+            else:
+                for k in ['city', 'region']:
+                    self.loc_info.update({k: self.loc_info[k].replace("'", "''")})
             self.dbcli = DBClient(self.config, self.loc_info, create=True)
 
         try:
@@ -163,8 +167,8 @@ class PhantomProbe():
             sys.exit("tstat outfile missing. Check your network configuration.")
 
         #testbed
-        logger.debug("Sleeping 10 sec")
-        time.sleep(10)
+        #logger.debug("Sleeping 10 sec")
+        #time.sleep(10)
         #end testbed
         if not self.tstatmanager.stop_capture():
             logger.error("Unable to stop tstat.")
@@ -212,13 +216,14 @@ class PhantomProbe():
                 logger.error("Unable to stop flume")
         else:
             logger.info("Sending data to server...")
-            try:
-                jc.send_csv()
-            except TimeoutError:
-                logger.error("Timeout in server connection")
-                pass
-            finally:
-                logger.info("Done.")
+            # FIXME
+            #try:
+            #    jc.send_csv()
+            #except TimeoutError:
+            #    logger.error("Timeout in server connection")
+            #    pass
+            #finally:
+            #    logger.info("Done.")
         self.dbcli.update_sent(to_update)
         try:
             for csv_path_fname in csv_path_fname_list:
