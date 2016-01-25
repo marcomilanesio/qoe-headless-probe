@@ -89,7 +89,7 @@ class FlumeManager():
 logger = logging.getLogger('probe')
 
 
-class PhantomProbe():
+class PhantomProbe:
         
     def __init__(self, conffile, url):
         self.config = Configuration(conffile)
@@ -264,7 +264,6 @@ if __name__ == '__main__':
             print("Use -h for complete list of options: wrong configuration file")
             sys.exit(0)
         conffile = options.conf_file
-
 
     f = PhantomProbe(conffile, url)
     f.execute()
