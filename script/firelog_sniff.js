@@ -16,7 +16,7 @@ Changelog v1.5		1) Har file formatted in one single raw
 
 Changelog v1.6		1) Har file in  /tmp/phantomjs.har
 
-Changelog v1.7      1) Added real size function for netw bytes
+Changelog v1.7      1) bugfix in netw bytes size
 */
 if (!Date.prototype.toISOString) {
     Date.prototype.toISOString = function () {
