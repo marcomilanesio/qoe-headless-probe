@@ -94,11 +94,11 @@ class PhantomProbe():
     def __init__(self, conffile, url):
         self.config = Configuration(conffile)
         self.url = url
-        self.__prepare()
+        self._prepare()
         self.diagnosis = {}
         self.flumepid = None
 
-    def __prepare(self):
+    def _prepare(self):
         ts = time.time()
         st = datetime.datetime.fromtimestamp(ts).strftime('%Y%m%d-%H%M%S')
         self.backup_dir = os.path.join(self.config.get_base_configuration()['backupdir'], st)
