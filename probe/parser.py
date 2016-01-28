@@ -105,7 +105,7 @@ class Parser():
     def get_datetime(harstr):
         print(harstr)
         #datetimestr = harstr.replace("T", " ")[:harstr.replace("T", " ").rfind("-")]
-        datetimestr = harstr.replace("T", " ")
+        datetimestr = harstr.replace("T", " ")[:-1]
         print(datetimestr)
         try:
             d = datetime.datetime.strptime(datetimestr, '%Y-%m-%d %H:%M:%S.%f')
