@@ -103,6 +103,7 @@ class Parser():
 
     @staticmethod
     def get_datetime(harstr):
+        print(harstr)
         datetimestr = harstr.replace("T", " ")[:harstr.replace("T", " ").rfind("-")]
         try:
             d = datetime.datetime.strptime(datetimestr, '%Y-%m-%d %H:%M:%S.%f')
