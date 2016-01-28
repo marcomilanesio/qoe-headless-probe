@@ -189,7 +189,7 @@ class JSONClient():
             if not os.path.exists(fname):
                 logger.error("No csv saved")
             else:
-                logger.error("Saved: {0}".format(fname))
+                logger.debug("Saved: {0}".format(fname))
                 csvfiles.append(fname)
             csvnum += 1
 

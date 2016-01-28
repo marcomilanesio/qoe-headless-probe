@@ -103,8 +103,8 @@ class PhantomProbe:
         st = datetime.datetime.fromtimestamp(ts).strftime('%Y%m%d-%H%M%S')
         self.backup_dir = os.path.join(self.config.get_base_configuration()['backupdir'], st)
         logger.info("Launching the probe...")
-        if not os.path.isdir(self.config.get_flume_configuration()['outdir']):
-            os.makedirs(self.config.get_flume_configuration()['outdir'])
+        #if not os.path.isdir(self.config.get_flume_configuration()['outdir']):
+        #    os.makedirs(self.config.get_flume_configuration()['outdir'])
         if not os.path.isdir(self.backup_dir):
             os.makedirs(self.backup_dir)
         self.tstat_out_file = self.config.get_database_configuration()['tstatfile']
@@ -129,6 +129,7 @@ class PhantomProbe:
                     self.loc_info.update({k: self.loc_info[k].replace("'", "''")})
             self.dbcli = DBClient(self.config, self.loc_info, create=True)
 
+        '''
         try:
             self.flumemanager = FlumeManager(self.config)
             self.flumemanager.start_flume()
@@ -137,6 +138,9 @@ class PhantomProbe:
         except FlumeNotFoundError:
             self.flumemanager = None
             logger.warning("Flume not found, sending to server instead.")
+        '''
+        self.flumepid = None
+
         self.pjs_config = self.config.get_phantomjs_configuration()
         self.tstatmanager = TstatManager(self.config)
         try:
@@ -206,6 +210,7 @@ class PhantomProbe:
         measurements = jc.prepare_data()
         to_update = [el['sid'] for el in measurements]
         csv_path_fname_list = jc.save_csv_files(measurements)
+        '''
         if self.flumemanager:
             self.flumepid = self.flumemanager.check_flume()
             logger.info("Waiting for flume to stop...[{}]".format(self.flumepid))
@@ -224,6 +229,7 @@ class PhantomProbe:
             #    pass
             #finally:
             #    logger.info("Done.")
+        '''
         self.dbcli.update_sent(to_update)
         try:
             for csv_path_fname in csv_path_fname_list:
