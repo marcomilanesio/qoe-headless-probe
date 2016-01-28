@@ -104,7 +104,12 @@ class Parser():
     @staticmethod
     def get_datetime(harstr):
         datetimestr = harstr.replace("T", " ")[:harstr.replace("T", " ").rfind("-")]
-        return datetime.datetime.strptime(datetimestr, '%Y-%m-%d %H:%M:%S.%f')
+        try:
+            d = datetime.datetime.strptime(datetimestr, '%Y-%m-%d %H:%M:%S.%f')
+        except ValueError:
+            print(datetimestr)
+            exit(0)
+        return d
 
     def parseHar(self):
         with open(self.harfile) as hf:
