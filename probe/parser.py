@@ -103,15 +103,13 @@ class Parser():
 
     @staticmethod
     def get_datetime(harstr):
-        print(harstr)
+        #TODO check
         #datetimestr = harstr.replace("T", " ")[:harstr.replace("T", " ").rfind("-")]
         datetimestr = harstr.replace("T", " ")[:-1]
-        print(datetimestr)
         try:
             d = datetime.datetime.strptime(datetimestr, '%Y-%m-%d %H:%M:%S.%f')
         except ValueError:
-            print(datetimestr)
-            exit(0)
+            return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
         return d
 
     def parseHar(self):
