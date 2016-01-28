@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 import sys
 import os
+import re
 import shutil
 import subprocess
 import tarfile
@@ -103,8 +104,8 @@ class PhantomProbe:
         st = datetime.datetime.fromtimestamp(ts).strftime('%Y%m%d-%H%M%S')
         self.backup_dir = os.path.join(self.config.get_base_configuration()['backupdir'], st)
         logger.info("Launching the probe...")
-        #if not os.path.isdir(self.config.get_flume_configuration()['outdir']):
-        #    os.makedirs(self.config.get_flume_configuration()['outdir'])
+        if not os.path.isdir(self.config.get_flume_configuration()['outdir']):
+            os.makedirs(self.config.get_flume_configuration()['outdir'])
         if not os.path.isdir(self.backup_dir):
             os.makedirs(self.backup_dir)
         self.tstat_out_file = self.config.get_database_configuration()['tstatfile']
@@ -255,13 +256,13 @@ if __name__ == '__main__':
     parser = OptionParser()
     parser.add_option("-c", "--conf", dest="conf_file", type="string", help="specify a configuration file", metavar="FILE")
     parser.add_option("-u", "--url", dest="url", type="string", help="specify a url", metavar="URL")
+    parser.add_option("-f", "--file", dest="file", type="string", help="specify a file containing urls")
     (options, args) = parser.parse_args()
-    if not options.url:
+    if not options.url and not options.file:
         print("Use -h for complete list of options")
-        print("Usage: {} -u url_to_browse [-c conf_file] ".format(__file__))
+        print("Usage: {} -u url_to_browse [-c conf_file] OR".format(__file__))
+        print("Usage: {} -f file_with_urls [-c conf_file] ".format(__file__))
         sys.exit(0)
-
-    url = options.url
 
     if not options.conf_file:
         conffile = os.path.join(package_directory, 'conf/firelog.conf')
@@ -271,7 +272,17 @@ if __name__ == '__main__':
             sys.exit(0)
         conffile = options.conf_file
 
-    f = PhantomProbe(conffile, url)
-    f.execute()
-    print(str(f.get_result()))
+    if options.file:
+        with open(options.file, 'r') as infile:
+            f = infile.readlines()
+        for el in f:
+            url = el.strip()
+            f = PhantomProbe(conffile, url)
+            f.execute()
+            print("{0}: {1}".format(url, str(f.get_result())))
+    else:
+        url = options.url
+        f = PhantomProbe(conffile, url)
+        f.execute()
+        print(str(f.get_result()))
     print("Bye.")
