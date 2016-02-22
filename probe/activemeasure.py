@@ -188,7 +188,11 @@ class ActiveMonitor(object):
             to_insert = []
             url = dic['url']
             server_ip = dic['complete']
-            ip_addrs = list(set(dic['addresses']))  # remove possible duplicates
+            try:
+                ip_addrs = list(set(dic['addresses']))  # remove possible duplicates
+            except KeyError:
+                print("Error: ['addresses'] ({0}): {1}".format(url, dic.keys()))
+                ip_addrs = []
 
             if sid not in tot.keys():
                 tot[sid] = []

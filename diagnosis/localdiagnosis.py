@@ -244,6 +244,9 @@ class LocalDiagnosisManager():
         except TypeError:
             third_rtt = second_rtt * 2  # FIXME: case when third hop does not answer ping
 
+        if third_rtt is None:
+            third_rtt = second_rtt * 2  # FIXME: case when third hop does not answer ping
+
         if self.cusums['cusumT1'].compute(gw_rtt):
             result = 'Local congestion (LAN/GW)'
             details = "cusum on RTT to 1st hop {0}".format(gw_addr)

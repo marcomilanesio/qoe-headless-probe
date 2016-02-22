@@ -105,11 +105,17 @@ class JSONClient():
                 a[active_row[0]] = {'ping': active_row[1], 'trace': active_row[2]}
                 r['active_measurements'].update(a)      # dictionary!
 
-            query = '''select diagnosis from {0} where sid = {1} and url = '{2}' '''\
-                .format(self.db.tables['diag_result'], r['sid'], r['session_url'])
+            #query = '''select diagnosis from {0} where sid = {1} and url = '{2}' '''\
+            #    .format(self.db.tables['diag_result'], r['sid'], r['session_url'])
+            query = '''select diagnosis from {0} where sid = {1}'''\
+                .format(self.db.tables['diag_result'], r['sid'])
 
             res = self.db.execute(query)
-            r['local_diagnosis'] = json.loads(res[0][0])
+            try:
+                r['local_diagnosis'] = json.loads(res[0][0])
+            except IndexError:
+                print("error: ", query)
+                r['local_diagnosis'] = "n.a."
 
             sessions_list.append(r)
 

@@ -210,7 +210,7 @@ class PhantomProbe:
         jc = JSONClient(self.config, self.dbcli)
         measurements = jc.prepare_data()
         to_update = [el['sid'] for el in measurements]
-        csv_path_fname_list = jc.save_csv_files(measurements)
+        #csv_path_fname_list = jc.save_csv_files(measurements)
         '''
         if self.flumemanager:
             self.flumepid = self.flumemanager.check_flume()
@@ -232,6 +232,7 @@ class PhantomProbe:
             #    logger.info("Done.")
         '''
         self.dbcli.update_sent(to_update)
+        '''
         try:
             for csv_path_fname in csv_path_fname_list:
                 shutil.copyfile(csv_path_fname, os.path.join(self.backup_dir, os.path.basename(csv_path_fname)))
@@ -246,6 +247,7 @@ class PhantomProbe:
                 tar.close()
                 logger.info('tar.gz backup file created.')
         shutil.rmtree(self.backup_dir)
+        '''
         logger.info('Done.')
         
     def get_result(self):
