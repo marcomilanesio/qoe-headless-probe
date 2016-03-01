@@ -51,7 +51,10 @@ class JSONClient():
         user, probe_id, first_start, location_str = res[0]
 
         location_dic = json.loads(location_str)
-        location_dic["loc"] = location_dic["loc"].replace(",", ";")
+        try:
+            location_dic["loc"] = location_dic["loc"].replace(",", ";")
+        except:
+            location_dic = ""
 
         assert self.probeid == probe_id
         probedata.update({'username': user, 'probe_id': probe_id,

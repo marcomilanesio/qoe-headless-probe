@@ -27,6 +27,7 @@ import os
 
 logger = logging.getLogger('Active')
 
+
 class Measure(object):
     def __init__(self, host):
         self.target = host
@@ -177,6 +178,7 @@ class ActiveMonitor(object):
         self.config = config
         self.db = dbconn
         self.inserted_sid = self.db.get_inserted_sid_addresses()
+        logger.debug("inserted.sid: ", self.inserted_sid)
         logger.info('Started active monitor: %d session(s).' % len(self.inserted_sid))
 
     def run_active_measurement(self):
@@ -184,14 +186,14 @@ class ActiveMonitor(object):
         result = {}
         probed_ip = {}
         for sid, dic in self.inserted_sid.items():
-            #print("active ", dic.keys())
+            logger.debug("sid, dic: {0} {1}".format(sid, dic))
             to_insert = []
             url = dic['url']
-            server_ip = dic['complete']
+            server_ip = dic['server_ip']
             try:
                 ip_addrs = list(set(dic['addresses']))  # remove possible duplicates
             except KeyError:
-                print("Error: ['addresses'] ({0}): {1}".format(url, dic.keys()))
+                logger.error("No ip addresses fetched when browsing {0} ({1}): ['addresses']: {2}".format(server_ip, url, dic.keys()))
                 ip_addrs = []
 
             if sid not in tot.keys():

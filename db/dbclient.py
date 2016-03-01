@@ -191,7 +191,7 @@ class DBClient():
                 logger.error("{0} -> {1}".format(res, tup))
 
             if ip == server_ip:
-                result[sid].update({'complete': server_ip})
+                result[sid].update({'server_ip': server_ip})
             else:
                 if 'addresses' not in result[sid].keys():
                     result[sid]['addresses'] = []

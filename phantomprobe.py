@@ -163,22 +163,25 @@ class PhantomProbe:
             if not self.tstatmanager.stop_capture():
                 logger.error("Unable to stop tstat.")
             sys.exit("Problems in browser thread. Aborting session...")
-        if not stats:
-            logger.warning('Problem in session to [%s].. skipping' % self.url)
-            utils.clean_tmp_files(self.backup_dir, [self.tstat_out_file, self.harfile], self.url, True)
-            sys.exit("Problems in stats collecting. Quitting...")
         if not os.path.exists(self.tstat_out_file):
             logger.error('tstat outfile missing. Check your network configuration.')
             sys.exit("tstat outfile missing. Check your network configuration.")
 
         #testbed
-        #logger.debug("Sleeping 10 sec")
-        #time.sleep(10)
+        logger.debug("Sleeping 1 sec")
+        time.sleep(1)
         #end testbed
         if not self.tstatmanager.stop_capture():
             logger.error("Unable to stop tstat.")
         else:
             logger.info("tstat successfully stopped.")
+
+        if not stats:
+            logger.warning('Problem in session to [%s].. skipping' % self.url)
+            utils.clean_tmp_files(self.backup_dir, [self.tstat_out_file, self.harfile], self.url, True)
+            #sys.exit("Problems in stats collecting. Quitting...")
+            return None
+
 
         inserted_sid = self.dbcli.load_to_db(stats)
         logger.info('Ended browsing to %s' % self.url)
@@ -202,7 +205,7 @@ class PhantomProbe:
                 os.remove(tracefile)
             l = LocalDiagnosisManager(self.dbcli, self.url)
             self.diagnosis = l.run_diagnosis(inserted_sid)
-            self.send_results()
+            #self.send_results()
         else:
             self.diagnosis = {"Warning": "Unable to perform browsing"}
 
@@ -278,13 +281,19 @@ if __name__ == '__main__':
         with open(options.file, 'r') as infile:
             f = infile.readlines()
         for el in f:
+            st = time.time()
             url = el.strip()
             f = PhantomProbe(conffile, url)
             f.execute()
-            print("{0}: {1}".format(url, str(f.get_result())))
+            en = time.time()
+            elapsed_time = int(en - st)
+            print("{0} ({1}): {2}".format(url, elapsed_time, str(f.get_result())))
     else:
         url = options.url
+        st = time.time()
         f = PhantomProbe(conffile, url)
         f.execute()
-        print(str(f.get_result()))
+        en = time.time()
+        elapsed_time = int(en - st)
+        print("{0} ({1}): {2}".format(url, elapsed_time, str(f.get_result())))
     print("Bye.")
