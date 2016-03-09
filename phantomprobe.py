@@ -11,6 +11,7 @@ import time
 import datetime
 import signal
 import sqlite3
+from collections import OrderedDict
 
 from probe.configuration import Configuration
 from probe.phantomjsmanager import PJSLauncher, PhantomjsNotFoundError
@@ -209,6 +210,7 @@ class PhantomProbe:
         else:
             self.diagnosis = {"Warning": "Unable to perform browsing"}
 
+
     def send_results(self):
         jc = JSONClient(self.config, self.dbcli)
         measurements = jc.prepare_data()
@@ -255,7 +257,13 @@ class PhantomProbe:
         
     def get_result(self):
         return self.diagnosis
-        
+
+
+def build_output(elapsed_time, url, result):
+    return OrderedDict({'sid': result['sid'], 'url': url, 'probe_time': elapsed_time, 'result': result['result'],
+                        'details': result['details']})
+
+
 if __name__ == '__main__':
     from optparse import OptionParser
     parser = OptionParser()
@@ -287,7 +295,7 @@ if __name__ == '__main__':
             f.execute()
             en = time.time()
             elapsed_time = int(en - st)
-            print("{0} ({1}): {2}".format(url, elapsed_time, str(f.get_result())))
+            logger.info(build_output(elapsed_time, url, f.get_result()))
     else:
         url = options.url
         st = time.time()
@@ -295,5 +303,5 @@ if __name__ == '__main__':
         f.execute()
         en = time.time()
         elapsed_time = int(en - st)
-        print("{0} ({1}): {2}".format(url, elapsed_time, str(f.get_result())))
+        logger.info(build_output(elapsed_time, url, f.get_result()))
     print("Bye.")

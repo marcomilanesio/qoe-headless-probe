@@ -188,7 +188,7 @@ class LocalDiagnosisManager():
         return passive, active, browser, passive_thresholds
 
     def run_diagnosis(self, sid):
-        diagnosis = OrderedDict({'result': None, 'details': None})
+        diagnosis = OrderedDict({'sid': sid, 'result': None, 'details': None})
         passive_m, active_m, browser_m, passive_thresholds = self.prepare_for_diagnosis(sid)
 
         if not passive_m or not active_m or not browser_m or not passive_thresholds:
