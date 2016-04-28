@@ -274,6 +274,7 @@ if __name__ == '__main__':
     parser.add_option("-u", "--url", dest="url", type="string", help="specify a url", metavar="URL")
     parser.add_option("-f", "--file", dest="file", type="string", help="specify a file containing urls")
     (options, args) = parser.parse_args()
+
     if not options.url and not options.file:
         print("Use -h for complete list of options")
         print("Usage: {} -u url_to_browse [-c conf_file] OR".format(__file__))
@@ -283,10 +284,10 @@ if __name__ == '__main__':
     if not options.conf_file:
         conffile = os.path.join(package_directory, 'conf/firelog.conf')
     else:
-        if not os.path.isfile(options.conf_file):
-            print("Use -h for complete list of options: wrong configuration file")
-            sys.exit(0)
         conffile = options.conf_file
+
+    if not os.path.isfile(conffile):
+        sys.exit("Configuration file not found: {}".format(conffile))
 
     if options.file:
         with open(options.file, 'r') as infile:
