@@ -60,7 +60,7 @@ class FlumeNotFoundError(FileNotFoundError):
     pass
 
 
-class FlumeManager():
+class FlumeManager:
     def __init__(self, config):
         self.confdir = config.get_flume_configuration()['confdir']
         self.conffile = config.get_flume_configuration()['conffile']
@@ -260,8 +260,11 @@ class PhantomProbe:
 
 
 def build_output(elapsed_time, url, result):
-    return OrderedDict({'sid': result['sid'], 'url': url, 'probe_time': elapsed_time, 'result': result['result'],
-                        'details': result['details']})
+    try:
+        return OrderedDict({'sid': result['sid'], 'url': url, 'probe_time': elapsed_time, 'result': result['result'],
+                            'details': result['details']})
+    except:
+        return "RES: {} {} {}".format(elapsed_time, url, result)
 
 
 if __name__ == '__main__':
